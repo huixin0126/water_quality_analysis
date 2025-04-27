@@ -5,7 +5,7 @@ class WaterPotabilityService {
   // URL to your Flask API (Option 1 from previous explanation)
   // If deployed locally for testing, use http://10.0.2.2:5000 for Android emulator
   // or your local IP address for physical devices
-  final String apiUrl = 'https://your-flask-api-url.com/predict';
+  final String apiUrl = 'https://water-quality-analysis-w0kk.onrender.com';
   
   /// Predicts water potability based on ph and tds values
   /// Returns a Map with potability probability and results
