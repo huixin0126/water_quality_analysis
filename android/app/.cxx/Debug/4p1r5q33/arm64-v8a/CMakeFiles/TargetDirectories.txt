@@ -1,0 +1,2 @@
+C:/Users/User/Documents/Degree/Sem 3/BITU3973 PROJECT I/WaterQualityAnalysis/water_quality_analysis/android/app/.cxx/Debug/4p1r5q33/arm64-v8a/CMakeFiles/edit_cache.dir
+C:/Users/User/Documents/Degree/Sem 3/BITU3973 PROJECT I/WaterQualityAnalysis/water_quality_analysis/android/app/.cxx/Debug/4p1r5q33/arm64-v8a/CMakeFiles/rebuild_cache.dir

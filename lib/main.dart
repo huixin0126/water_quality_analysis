@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/intl.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 // Import all screen files
 import 'pages/welcome_page.dart';
@@ -18,8 +19,14 @@ import 'pages/reminder_page.dart';
 import 'pages/set_reminder_page.dart';
 import 'pages/water_intake_reminder_page.dart';
 
-void main() {
-  runApp(const WaterQualityApp());
+// void main() {
+//   runApp(const WaterQualityApp());
+// }
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(); // Ensure Firebase is initialized
+  runApp(WaterQualityApp());
 }
 
 class WaterQualityApp extends StatelessWidget {

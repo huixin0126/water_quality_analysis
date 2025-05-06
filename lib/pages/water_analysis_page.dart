@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
 import '../services/water_potability_service.dart';
+import '../services/water_analysis_firestore_service.dart';
 
 class WaterAnalysisPage extends StatefulWidget {
   const WaterAnalysisPage({Key? key}) : super(key: key);
@@ -12,31 +13,15 @@ class WaterAnalysisPage extends StatefulWidget {
 class _WaterAnalysisPageState extends State<WaterAnalysisPage> {
   final TextEditingController _tdsController = TextEditingController();
   final TextEditingController _phController = TextEditingController();
-  final TextEditingController _turbidityController = TextEditingController();
-  bool _showPlaceholder = true;
   bool _isAnalyzing = false;
   final WaterPotabilityService _potabilityService = WaterPotabilityService();
+  final WaterAnalysisFirestoreService _firestoreService = WaterAnalysisFirestoreService();
 
   @override
   void dispose() {
     _tdsController.dispose();
     _phController.dispose();
-    _turbidityController.dispose();
     super.dispose();
-  }
-
-  void _uploadImage() {
-    // Implement image upload logic
-    setState(() {
-      _showPlaceholder = false;
-    });
-    
-    // Show success message
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Image uploaded successfully'),
-      ),
-    );
   }
 
   void _analyzeWater() async {
@@ -84,23 +69,25 @@ class _WaterAnalysisPageState extends State<WaterAnalysisPage> {
       // Call the prediction service
       final result = await _potabilityService.predictPotability(ph, tds);
       
+      // Save result to Firestore
+      String analysisId = await _firestoreService.saveWaterAnalysisResult(
+        ph: ph,
+        tds: tds,
+        potableProbability: result['potable_probability'],
+        isPotable: result['is_potable'],
+      );
+      
       // Analysis complete
       setState(() {
         _isAnalyzing = false;
       });
       
-      // Navigate to results page with the prediction data
+      // Navigate to results page with the analysis ID
       Navigator.pushNamed(
         context,
         '/water_analysis_result',
         arguments: {
-          'potable_probability': result['potable_probability'],
-          'not_potable_probability': result['not_potable_probability'],
-          'is_potable': result['is_potable'],
-          'ph': ph,
-          'tds': tds,
-          'turbidity': _turbidityController.text.isNotEmpty ? 
-            double.parse(_turbidityController.text) : null,
+          'analysis_id': analysisId,
         },
       );
     } catch (e) {
@@ -128,6 +115,16 @@ class _WaterAnalysisPageState extends State<WaterAnalysisPage> {
             Navigator.pop(context);
           },
         ),
+        actions: [
+          // History button to see past analysis
+          IconButton(
+            icon: const Icon(Icons.history),
+            onPressed: () {
+              Navigator.pushNamed(context, '/water_analysis_history');
+            },
+            tooltip: 'Analysis History',
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -135,10 +132,18 @@ class _WaterAnalysisPageState extends State<WaterAnalysisPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Start Analysis Water',
+              'Water Analysis',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Enter water parameters to analyze potability',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey,
               ),
             ),
             
@@ -160,6 +165,7 @@ class _WaterAnalysisPageState extends State<WaterAnalysisPage> {
                 hintText: 'Enter TDS',
                 filled: true,
                 fillColor: Color(0xFFF3F4F6),
+                suffixText: 'mg/L',
               ),
             ),
             
@@ -181,128 +187,6 @@ class _WaterAnalysisPageState extends State<WaterAnalysisPage> {
                 hintText: 'Enter PH',
                 filled: true,
                 fillColor: Color(0xFFF3F4F6),
-              ),
-            ),
-            
-            const SizedBox(height: 24),
-            
-            // Water Turbidity field
-            const Text(
-              'Water Turbidity (Optional)',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _turbidityController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                hintText: 'Enter Turbidity (ppm)',
-                filled: true,
-                fillColor: Color(0xFFF3F4F6),
-              ),
-            ),
-            
-            const SizedBox(height: 16),
-            
-            const Text(
-              'Or',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey,
-              ),
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // Image upload section
-            GestureDetector(
-              onTap: _uploadImage,
-              child: Container(
-                width: double.infinity,
-                height: 150,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF3F4F6),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: _showPlaceholder
-                    ? Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            width: 60,
-                            height: 60,
-                            decoration: const BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.add,
-                              size: 30,
-                              color: Colors.black54,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            "It's empty here",
-                            style: TextStyle(
-                              color: Colors.black54,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.blue,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: const [
-                                Icon(
-                                  Icons.add,
-                                  size: 16,
-                                  color: Colors.white,
-                                ),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Upload new',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      )
-                    : Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            width: 60,
-                            height: 60,
-                            decoration: const BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.add,
-                              size: 30,
-                              color: Colors.black54,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Input',
-                            style: TextStyle(
-                              color: Colors.black54,
-                            ),
-                          ),
-                        ],
-                      ),
               ),
             ),
             

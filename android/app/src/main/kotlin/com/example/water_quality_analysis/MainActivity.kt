@@ -1,4 +1,4 @@
-package com.example.water_quality_analysis
+package com.biti.water_quality_analysis
 
 import io.flutter.embedding.android.FlutterActivity
 

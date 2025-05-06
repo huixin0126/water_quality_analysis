@@ -1,20 +1,136 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
+import '../services/water_analysis_firestore_service.dart';
+import 'package:intl/intl.dart';
 
-class WaterAnalysisResultPage extends StatelessWidget {
+class WaterAnalysisResultPage extends StatefulWidget {
   const WaterAnalysisResultPage({Key? key}) : super(key: key);
 
   @override
+  State<WaterAnalysisResultPage> createState() => _WaterAnalysisResultPageState();
+}
+
+class _WaterAnalysisResultPageState extends State<WaterAnalysisResultPage> {
+  final WaterAnalysisFirestoreService _firestoreService = WaterAnalysisFirestoreService();
+  bool _isLoading = true;
+  Map<String, dynamic> _analysisData = {};
+  String? _errorMessage;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      // Get the analysis ID from the route arguments
+      final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>? ?? {};
+      final String? analysisId = args['analysis_id'];
+
+      if (analysisId == null) {
+        throw Exception('Missing analysis ID');
+      }
+
+      // Fetch the data from Firestore
+      _analysisData = await _firestoreService.getWaterAnalysisResult(analysisId);
+      
+      setState(() {
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = e.toString();
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Retrieve the results from the arguments
-    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>? ?? {};
+    // Handle loading state
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Water Analysis Result'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              Navigator.pop(context);
+            },
+          ),
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(),
+        ),
+        bottomNavigationBar: const BottomNavBar(currentIndex: 1),
+      );
+    }
+
+    // Handle error state
+    if (_errorMessage != null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Water Analysis Result'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              Navigator.pop(context);
+            },
+          ),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.error_outline,
+                  color: Colors.red,
+                  size: 60,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Error Loading Results',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _errorMessage!,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: _loadData,
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          ),
+        ),
+        bottomNavigationBar: const BottomNavBar(currentIndex: 1),
+      );
+    }
+
+    // Get the values from the data
+    final double potableProbability = _analysisData['potable_probability'] ?? 0.0;
+    final bool isPotable = _analysisData['is_potable'] ?? false;
+    final double ph = _analysisData['ph'] ?? 7.0;
+    final double tds = _analysisData['tds'] ?? 0.0;
+    final double? turbidity = _analysisData['turbidity'];
     
-    // Get the prediction values (with defaults if not provided)
-    final double potableProbability = args['potable_probability'] ?? 72.0;
-    final bool isPotable = args['is_potable'] ?? true;
-    final double ph = args['ph'] ?? 7.0;
-    final double tds = args['tds'] ?? 300.0;
-    final double? turbidity = args['turbidity'];
+    // Format timestamp (if available)
+    String timestampText = 'N/A';
+    if (_analysisData['timestamp'] != null) {
+      final timestamp = _analysisData['timestamp'].toDate();
+      timestampText = DateFormat('MMM d, yyyy - h:mm a').format(timestamp);
+    }
     
     // Determine the result color and text
     final Color resultColor = isPotable ? const Color(0xFF10B981) : const Color(0xFFEF4444);
@@ -32,11 +148,37 @@ class WaterAnalysisResultPage extends StatelessWidget {
             Navigator.pop(context);
           },
         ),
+        actions: [
+          // Share button
+          IconButton(
+            icon: const Icon(Icons.share),
+            onPressed: () {
+              // Implement share functionality here
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Share functionality coming soon')),
+              );
+            },
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
+            // Timestamp display
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                'Analyzed: $timestampText',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey,
+                ),
+              ),
+            ),
+            
+            const SizedBox(height: 8),
+            
             // Main Result Card
             Card(
               elevation: 1,

@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "129872172916",
+    "project_id": "psm-waterqualityanalysis",
+    "storage_bucket": "psm-waterqualityanalysis.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:129872172916:android:8ea63a3205b13920b67e21",
+        "android_client_info": {
+          "package_name": "com.biti.water_quality_analysis"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "129872172916-05pl4uja4ps10kgdg9imea0mg8jiqq94.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBeMeC8ifzszJ1EoWGYUbS-oGoy7mdD2lM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "129872172916-05pl4uja4ps10kgdg9imea0mg8jiqq94.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

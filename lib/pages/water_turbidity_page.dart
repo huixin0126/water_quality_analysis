@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:water_quality_analysis/main.dart';
+import 'water_turbidity_result_page.dart';
+import '../class/water_quality_model.dart';
 
 class WaterTurbidityPage extends StatefulWidget {
   const WaterTurbidityPage({Key? key}) : super(key: key);
@@ -13,9 +15,38 @@ class WaterTurbidityPage extends StatefulWidget {
 class _WaterTurbidityPageState extends State<WaterTurbidityPage> {
   File? _imageFile;
   final ImagePicker _picker = ImagePicker();
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _preloadModel();
+  }
+
+  Future<void> _preloadModel() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final model = WaterQualityModel();
+      await model.loadModel();
+    } catch (e) {
+      debugPrint('Error preloading model: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   Future<void> _takePhoto() async {
-    final XFile? photo = await _picker.pickImage(source: ImageSource.camera);
+    final XFile? photo = await _picker.pickImage(
+      source: ImageSource.camera,
+      maxWidth: 1200,
+      maxHeight: 1200,
+      imageQuality: 90,
+    );
     if (photo != null) {
       setState(() {
         _imageFile = File(photo.path);
@@ -24,11 +55,27 @@ class _WaterTurbidityPageState extends State<WaterTurbidityPage> {
   }
 
   Future<void> _pickImage() async {
-    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+    final XFile? image = await _picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1200,
+      maxHeight: 1200,
+      imageQuality: 90,
+    );
     if (image != null) {
       setState(() {
         _imageFile = File(image.path);
       });
+    }
+  }
+
+  void _navigateToAnalysisResult() {
+    if (_imageFile != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => WaterTurbidityResultPage(imageFile: _imageFile!),
+        ),
+      );
     }
   }
 
@@ -146,13 +193,22 @@ class _WaterTurbidityPageState extends State<WaterTurbidityPage> {
             
             const SizedBox(height: 32),
             
+            // Model loading indicator
+            if (_isLoading)
+              const Center(
+                child: Column(
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 8),
+                    Text('Initializing analysis model...'),
+                  ],
+                ),
+              ),
+            
             // Analyze button
             ElevatedButton(
-              onPressed: _imageFile != null
-                  ? () {
-                      // Navigate to result page or show analysis
-                      Navigator.pushNamed(context, '/water_analysis_result');
-                    }
+              onPressed: _imageFile != null && !_isLoading
+                  ? _navigateToAnalysisResult
                   : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF6366F1),
