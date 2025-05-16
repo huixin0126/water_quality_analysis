@@ -3,7 +3,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:water_quality_analysis/main.dart';
 import 'water_turbidity_result_page.dart';
-import '../class/water_quality_model.dart';
+import '../class/water_turbidity_model.dart';
 
 class WaterTurbidityPage extends StatefulWidget {
   const WaterTurbidityPage({Key? key}) : super(key: key);
@@ -88,6 +88,16 @@ class _WaterTurbidityPageState extends State<WaterTurbidityPage> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          // History button to see past analysis
+          IconButton(
+            icon: const Icon(Icons.history),
+            onPressed: () {
+              Navigator.pushNamed(context, '/water_turbidity_history');
+            },
+            tooltip: 'Analysis History',
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),

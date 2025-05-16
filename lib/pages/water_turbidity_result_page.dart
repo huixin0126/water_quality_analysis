@@ -1,7 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:water_quality_analysis/main.dart';
-import '../class/water_quality_model.dart';
+import '../class/water_turbidity_model.dart';
+import '../services/water_turbidity_service.dart';  // Make sure to import the service
 
 class WaterTurbidityResultPage extends StatefulWidget {
   final File imageFile;
@@ -14,8 +15,11 @@ class WaterTurbidityResultPage extends StatefulWidget {
 
 class _WaterTurbidityResultPageState extends State<WaterTurbidityResultPage> {
   bool _isAnalyzing = true;
+  bool _isSaving = false;
   Map<String, dynamic>? _analysisResults;
   String _errorMessage = '';
+  final WaterTurbidityService _turbidityService = WaterTurbidityService();
+  TextEditingController _notesController = TextEditingController();
 
   @override
   void initState() {
@@ -23,14 +27,15 @@ class _WaterTurbidityResultPageState extends State<WaterTurbidityResultPage> {
     _analyzeImage();
   }
 
+  @override
+  void dispose() {
+    _notesController.dispose();
+    super.dispose();
+  }
+
   Future<void> _analyzeImage() async {
     try {
-      final model = WaterQualityModel();
-      if (!model.isLoaded) {
-        await model.loadModel();
-      }
-      
-      final results = await model.analyzeImage(widget.imageFile);
+      final results = await _turbidityService.analyzeTurbidityWithConfidence(widget.imageFile);
       
       setState(() {
         _analysisResults = results;
@@ -45,70 +50,111 @@ class _WaterTurbidityResultPageState extends State<WaterTurbidityResultPage> {
     }
   }
 
-  Widget _buildTurbidityMeter(double ntuValue) {
-    // Convert NTU to a 0-100 scale for visualization
-    double score = 0;
-    if (ntuValue <= 1) {
-      score = ntuValue * 10; // 0-10 scale
-    } else if (ntuValue <= 5) {
-      score = 10 + ((ntuValue - 1) / 4) * 10; // 10-20 scale
-    } else if (ntuValue <= 30) {
-      score = 20 + ((ntuValue - 5) / 25) * 20; // 20-40 scale
-    } else if (ntuValue <= 90) {
-      score = 40 + ((ntuValue - 30) / 60) * 30; // 40-70 scale
-    } else {
-      score = 70 + ((ntuValue - 90) / 60) * 30; // 70-100 scale
-    }
+  Future<void> _saveResults() async {
+    if (_analysisResults == null) return;
     
+    setState(() {
+      _isSaving = true;
+    });
+    
+    try {
+      // Add notes from the text controller if present
+      if (_notesController.text.isNotEmpty) {
+        _analysisResults!['notes'] = _notesController.text;
+      }
+      
+      // Save the analysis result
+      final analysisId = await _turbidityService.saveAnalysisResult(
+        _analysisResults!,
+        widget.imageFile,
+      );
+      
+      setState(() {
+        _isSaving = false;
+      });
+      
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Analysis saved successfully!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      
+      // Navigate to water analysis page after saving
+      Navigator.pushReplacementNamed(context, '/analysis');
+      
+    } catch (e) {
+      setState(() {
+        _isSaving = false;
+      });
+      
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to save analysis: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      
+      debugPrint('Error saving results: $e');
+    }
+  }
+
+  Widget _buildTurbidityDonut(List<dynamic> detectedClasses) {
+    if (detectedClasses.isEmpty) return const SizedBox.shrink();
+
+    // Get class with highest confidence
+    final maxClass = (detectedClasses as List<Map<String, dynamic>>).reduce(
+      (a, b) => (a['confidence'] as double) > (b['confidence'] as double) ? a : b,
+    );
+
+    final maxConfidence = maxClass['confidence'] as double;
+    final percentage = (maxConfidence * 100).clamp(0, 100);
+    final className = maxClass['class_name'] as String;
+
     return Column(
       children: [
         const Text(
-          'Turbidity Level (NTU)',
+          'Turbidity Level (Percentage)',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
           ),
         ),
-        const SizedBox(height: 10),
-        Container(
-          height: 40,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Colors.lightBlue, Colors.blue, Colors.amber, Colors.orange, Colors.brown],
-            ),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Stack(
-            children: [
-              Positioned(
-                left: (score / 100) * MediaQuery.of(context).size.width * 0.8,
-                child: Container(
-                  width: 3,
-                  height: 40,
-                  color: Colors.black,
+        const SizedBox(height: 16),
+        Stack(
+          alignment: Alignment.center,
+          children: [
+            SizedBox(
+              height: 150,
+              width: 150,
+              child: CircularProgressIndicator(
+                value: percentage / 100,
+                strokeWidth: 16,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  _getColorForConfidence(maxConfidence),
                 ),
+                backgroundColor: Colors.grey.shade300,
               ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 5),
-        Text(
-          'NTU Value: ${ntuValue.toStringAsFixed(1)}',
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 20),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: const [
-            Text('< 1 NTU', style: TextStyle(color: Colors.lightBlue)),
-            Text('< 5 NTU', style: TextStyle(color: Colors.blue)),
-            Text('< 30 NTU', style: TextStyle(color: Colors.amber)),
-            Text('< 90 NTU', style: TextStyle(color: Colors.orange)),
-            Text('> 90 NTU', style: TextStyle(color: Colors.brown)),
+            ),
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  '${percentage.toStringAsFixed(1)}%',
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  className,
+                  style: const TextStyle(fontSize: 14),
+                ),
+              ],
+            ),
           ],
         ),
       ],
@@ -180,6 +226,39 @@ class _WaterTurbidityResultPageState extends State<WaterTurbidityResultPage> {
           },
         ),
       ],
+    );
+  }
+
+  // Add notes field
+  Widget _buildNotesField() {
+    return Card(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Notes',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _notesController,
+              decoration: const InputDecoration(
+                hintText: 'Add notes about this sample...',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 3,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -269,14 +348,19 @@ class _WaterTurbidityResultPageState extends State<WaterTurbidityResultPage> {
                       ),
                       const SizedBox(height: 24),
                       
-                      // Turbidity meter
-                      _buildTurbidityMeter(_analysisResults!['estimated_ntu'] as double),
+                      // Turbidity donut
+                      _buildTurbidityDonut(_analysisResults!['detected_classes'] as List<dynamic>),
                       const SizedBox(height: 24),
                       
                       // Detailed class results
                       _buildClassDetails(),
                       
-                      const SizedBox(height: 30),
+                      const SizedBox(height: 24),
+                      
+                      // Notes field
+                      _buildNotesField(),
+                      
+                      const SizedBox(height: 24),
                       
                       // Water quality recommendations
                       Card(
@@ -297,7 +381,13 @@ class _WaterTurbidityResultPageState extends State<WaterTurbidityResultPage> {
                                 ),
                               ),
                               const SizedBox(height: 10),
-                              Text(_getRecommendation(_analysisResults!['estimated_ntu'] as double)),
+                              Text(
+                                _getRecommendationFromClass(
+                                  (_analysisResults!['detected_classes'] as List<dynamic>)
+                                      .cast<Map<String, dynamic>>()
+                                      .reduce((a, b) => (a['confidence'] as double) > (b['confidence'] as double) ? a : b)['class_name'] as String,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -323,16 +413,18 @@ class _WaterTurbidityResultPageState extends State<WaterTurbidityResultPage> {
                           ),
                           const SizedBox(width: 16),
                           Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () {
-                                // TODO: Implement save or share functionality
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Save feature coming soon!')),
-                                );
-                              },
-                              icon: const Icon(Icons.save_alt),
-                              label: const Text('Save Results'),
-                              style: OutlinedButton.styleFrom(
+                            child: ElevatedButton.icon(
+                              onPressed: _isSaving ? null : _saveResults,
+                              icon: _isSaving 
+                                  ? const SizedBox(
+                                      width: 20, 
+                                      height: 20, 
+                                      child: CircularProgressIndicator(strokeWidth: 2)
+                                    )
+                                  : const Icon(Icons.save),
+                              label: Text(_isSaving ? 'Saving...' : 'Save Results'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
                                 padding: const EdgeInsets.symmetric(vertical: 16),
                               ),
                             ),
@@ -346,17 +438,17 @@ class _WaterTurbidityResultPageState extends State<WaterTurbidityResultPage> {
     );
   }
   
-  String _getRecommendation(double ntuValue) {
-    if (ntuValue < 1.0) {
+  String _getRecommendationFromClass(String className) {
+    if (className.contains('1')) {
       return 'Water is clear and can be safe for drinking after standard disinfection. Suitable for most uses.';
-    } else if (ntuValue <= 5.0) {
+    } else if (className.contains('30')) {
       return 'Water has low turbidity. Basic filtration recommended before drinking. Suitable for most uses after treatment.';
-    } else if (ntuValue <= 30.0) {
+    } else if (className.contains('90')) {
       return 'Moderate turbidity detected. Use proper filtration methods and disinfection before consumption. May not be ideal for some sensitive uses.';
-    } else if (ntuValue <= 90.0) {
+    } else if (className.contains('150')) {
       return 'High turbidity detected. Advanced filtration required. Not recommended for drinking without thorough treatment. Limited use applications.';
     } else {
-      return 'Extremely turbid water detected. Professional water treatment required. Do not consume. Not suitable for most applications without extensive treatment.';
+      return 'Unknown class. Further analysis needed to determine appropriate treatment.';
     }
   }
 }

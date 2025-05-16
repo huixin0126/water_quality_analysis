@@ -48,6 +48,12 @@ dependencies:
   path_provider: ^2.1.5
   tflite_flutter: ^0.11.0
   image: ^4.5.4
+  flutter_app_badger: ^1.5.0
+  timezone: ^0.9.4
+  flutter_local_notifications: ^18.0.1
+  # firebase_crashlytics: ^4.3.5
+  # awesome_notifications_fcm: ^0.10.0
+  # awesome_notifications_core: ^0.10.1
 
 dev_dependencies:
   flutter_test:

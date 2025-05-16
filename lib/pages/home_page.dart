@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../main.dart';
+import '../services/water_quality_firestore_service.dart';
+import '../services/water_turbidity_service.dart';
+import '../services/filter_prediction_service.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -12,44 +17,153 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   String _selectedTimeRange = 'Last 7 days';
   final List<String> _timeRanges = ['Last 7 days', 'Last 30 days', 'Last 90 days'];
+  String? _profileImageUrl;
+  bool _isLoadingProfileImage = true;
+  bool _isLoadingData = true;
+  String? _errorMessage;
 
-  // Sample data for the chart
-  final List<FlSpot> tdsSpots = [
-    FlSpot(0, 15),
-    FlSpot(1, 18),
-    FlSpot(2, 22),
-    FlSpot(3, 26),
-    FlSpot(4, 24),
-    FlSpot(5, 20),
-    FlSpot(6, 17),
-  ];
+  final WaterQualityFirestoreService _waterQualityService = WaterQualityFirestoreService();
+  final WaterTurbidityService _turbidityService = WaterTurbidityService();
+  final FilterPredictionService _filterPredictionService = FilterPredictionService();
+  List<Map<String, dynamic>> _waterQualityData = [];
+  List<String> _dateLabels = [];
+  Map<String, dynamic>? _latestTurbidityData;
+  Map<String, dynamic>? _latestFilterPrediction;
 
-  final List<FlSpot> phSpots = [
-    FlSpot(0, 5),
-    FlSpot(1, 4.5),
-    FlSpot(2, 5.2),
-    FlSpot(3, 6.3),
-    FlSpot(4, 7.4),
-    FlSpot(5, 8.1),
-    FlSpot(6, 9),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadProfileImage();
+    _loadWaterQualityData();
+    _loadLatestTurbidityData();
+    _loadLatestFilterPrediction();
+  }
+
+  // Load profile image from Firestore
+  Future<void> _loadProfileImage() async {
+    setState(() {
+      _isLoadingProfileImage = true;
+    });
+
+    try {
+      User? currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null) {
+        // First check if user has a photoURL directly in Firebase Auth
+        if (currentUser.photoURL != null) {
+          setState(() {
+            _profileImageUrl = currentUser.photoURL;
+          });
+        } else {
+          // If not, try to fetch from Firestore
+          DocumentSnapshot userDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(currentUser.uid)
+              .get();
+
+          if (userDoc.exists) {
+            Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
+            setState(() {
+              _profileImageUrl = userData['profileImageUrl'];
+            });
+          }
+        }
+      }
+    } catch (e) {
+      // Handle error silently
+    } finally {
+      setState(() {
+        _isLoadingProfileImage = false;
+      });
+    }
+  }
+
+  // Load water quality data from Firestore
+  Future<void> _loadWaterQualityData() async {
+    setState(() {
+      _isLoadingData = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final data = await _waterQualityService.getWaterQualityData(_selectedTimeRange);
+      setState(() {
+        _waterQualityData = data;
+        _dateLabels = _waterQualityService.getDateLabels(data);
+        _isLoadingData = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to load water quality data: ${e.toString()}';
+        _isLoadingData = false;
+      });
+    }
+  }
+
+  // Load latest turbidity data
+  Future<void> _loadLatestTurbidityData() async {
+    try {
+      final data = await _turbidityService.getLatestTurbidityData();
+      setState(() {
+        _latestTurbidityData = data;
+      });
+    } catch (e) {
+      print('Error loading turbidity data: $e');
+    }
+  }
+
+  Future<void> _loadLatestFilterPrediction() async {
+    try {
+      final prediction = await _filterPredictionService.getLatestPrediction();
+      setState(() {
+        _latestFilterPrediction = prediction;
+      });
+    } catch (e) {
+      print('Error loading filter prediction: $e');
+    }
+  }
+
+  // Get chart data for a specific parameter
+  List<FlSpot> _getChartData(String parameter) {
+    return _waterQualityService.convertToChartData(_waterQualityData, parameter);
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: const Text('Home'),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: GestureDetector(
               onTap: () {
-                Navigator.pushNamed(context, '/profile');
+                Navigator.pushNamed(context, '/profile').then((_) {
+                  // Reload profile image when returning from profile page
+                  _loadProfileImage();
+                });
               },
-              child: const CircleAvatar(
-                radius: 18,
-                backgroundImage: NetworkImage('https://via.placeholder.com/150'),
-              ),
+              child: _isLoadingProfileImage
+                  ? const SizedBox(
+                      width: 36,
+                      height: 36,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : CircleAvatar(
+                      radius: 18,
+                      backgroundColor: Colors.blue.shade100,
+                      backgroundImage: _profileImageUrl != null
+                          ? NetworkImage(_profileImageUrl!)
+                          : null,
+                      child: _profileImageUrl == null
+                          ? const Icon(
+                              Icons.person,
+                              color: Colors.white,
+                            )
+                          : null,
+                    ),
             ),
           ),
         ],
@@ -89,6 +203,7 @@ class _HomePageState extends State<HomePage> {
                               setState(() {
                                 _selectedTimeRange = newValue;
                               });
+                              _loadWaterQualityData();
                             }
                           },
                           items: _timeRanges.map<DropdownMenuItem<String>>((String value) {
@@ -147,95 +262,130 @@ class _HomePageState extends State<HomePage> {
                     const SizedBox(height: 16),
                     
                     // Line Chart
-                    SizedBox(
-                      height: 200,
-                      child: LineChart(
-                        LineChartData(
-                          lineTouchData: LineTouchData(
-                            touchTooltipData: LineTouchTooltipData(
-                              getTooltipColor: (LineBarSpot spot) => Colors.white.withOpacity(0.8),
-                              tooltipBorderRadius: BorderRadius.circular(8),
-                              tooltipBorder: BorderSide(color: Colors.grey, width: 1),
-                              tooltipPadding: EdgeInsets.all(8),
-                              tooltipMargin: 10,
+                    if (_isLoadingData)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(32.0),
+                          child: CircularProgressIndicator(),
+                        ),
+                      )
+                    else if (_errorMessage != null)
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(32.0),
+                          child: Text(
+                            _errorMessage!,
+                            style: const TextStyle(color: Colors.red),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      )
+                    else if (_waterQualityData.isEmpty)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(32.0),
+                          child: Text(
+                            'No water quality data available for the selected time range',
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      )
+                    else
+                      SizedBox(
+                        height: 200,
+                        child: LineChart(
+                          LineChartData(
+                            lineTouchData: LineTouchData(
+                              touchTooltipData: LineTouchTooltipData(
+                                getTooltipColor: (LineBarSpot spot) => Colors.white.withOpacity(0.8),
+                                tooltipBorderRadius: BorderRadius.circular(8),
+                                tooltipBorder: BorderSide(color: Colors.grey, width: 1),
+                                tooltipPadding: const EdgeInsets.all(8),
+                                tooltipMargin: 10,
+                              ),
                             ),
-                          ),
-                          gridData: FlGridData(
-                            show: true,
-                            drawVerticalLine: false,
-                            horizontalInterval: 2,
-                            getDrawingHorizontalLine: (value) {
-                              return FlLine(
-                                color: Colors.grey.withOpacity(0.2),
-                                strokeWidth: 1,
-                              );
-                            },
-                          ),
-                          titlesData: FlTitlesData(
-                            bottomTitles: AxisTitles(
-                              sideTitles: SideTitles(
-                                showTitles: true,
-                                getTitlesWidget: (value, meta) {
-                                  final days = ['Wed', 'Thu', 'Fri', 'Sat', 'Sun', 'Mon', 'Tue'];
-                                  if (value >= 0 && value < days.length) {
+                            gridData: FlGridData(
+                              show: true,
+                              drawVerticalLine: false,
+                              horizontalInterval: 2,
+                              getDrawingHorizontalLine: (value) {
+                                return FlLine(
+                                  color: Colors.grey.withOpacity(0.2),
+                                  strokeWidth: 1,
+                                );
+                              },
+                            ),
+                            titlesData: FlTitlesData(
+                              bottomTitles: AxisTitles(
+                                sideTitles: SideTitles(
+                                  showTitles: true,
+                                  getTitlesWidget: (value, meta) {
+                                    if (value >= 0 && value < _dateLabels.length) {
+                                      return Text(
+                                        _dateLabels[value.toInt()],
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.grey,
+                                        ),
+                                      );
+                                    }
+                                    return const Text('');
+                                  },
+                                ),
+                              ),
+                              leftTitles: AxisTitles(
+                                sideTitles: SideTitles(
+                                  showTitles: true,
+                                  getTitlesWidget: (value, meta) {
                                     return Text(
-                                      days[value.toInt()],
+                                      value.toInt().toString(),
                                       style: const TextStyle(
-                                        color: Colors.grey,
                                         fontSize: 10,
+                                        color: Colors.grey,
                                       ),
                                     );
-                                  }
-                                  return const Text('');
-                                },
+                                  },
+                                ),
+                              ),
+                              rightTitles: AxisTitles(
+                                sideTitles: SideTitles(showTitles: false),
+                              ),
+                              topTitles: AxisTitles(
+                                sideTitles: SideTitles(showTitles: false),
                               ),
                             ),
-                            leftTitles: AxisTitles(
-                              sideTitles: SideTitles(
-                                showTitles: false,
+                            borderData: FlBorderData(show: false),
+                            lineBarsData: [
+                              // TDS Line
+                              LineChartBarData(
+                                spots: _getChartData('tds'),
+                                isCurved: true,
+                                color: const Color(0xFF6366F1),
+                                barWidth: 2,
+                                isStrokeCapRound: true,
+                                dotData: FlDotData(show: false),
+                                belowBarData: BarAreaData(
+                                  show: true,
+                                  color: const Color(0xFF6366F1).withOpacity(0.1),
+                                ),
                               ),
-                            ),
-                            topTitles: AxisTitles(
-                              sideTitles: SideTitles(
-                                showTitles: false,
+                              // PH Line
+                              LineChartBarData(
+                                spots: _getChartData('ph'),
+                                isCurved: true,
+                                color: const Color(0xFFEC4899),
+                                barWidth: 2,
+                                isStrokeCapRound: true,
+                                dotData: FlDotData(show: false),
+                                belowBarData: BarAreaData(
+                                  show: true,
+                                  color: const Color(0xFFEC4899).withOpacity(0.1),
+                                ),
                               ),
-                            ),
-                            rightTitles: AxisTitles(
-                              sideTitles: SideTitles(
-                                showTitles: false,
-                              ),
-                            ),
+                            ],
                           ),
-                          borderData: FlBorderData(show: false),
-                          lineBarsData: [
-                            // TDS Line
-                            LineChartBarData(
-                              spots: tdsSpots,
-                              isCurved: true,
-                              color: const Color(0xFF6366F1),
-                              barWidth: 3,
-                              dotData: FlDotData(show: false),
-                              belowBarData: BarAreaData(
-                                show: true,
-                                color: const Color(0xFF6366F1).withOpacity(0.1),
-                              ),
-                            ),
-                            // PH Line
-                            LineChartBarData(
-                              spots: phSpots,
-                              isCurved: true,
-                              color: const Color(0xFFEC4899),
-                              barWidth: 3,
-                              dotData: FlDotData(show: false),
-                              belowBarData: BarAreaData(
-                                show: true,
-                                color: const Color(0xFFEC4899).withOpacity(0.1),
-                              ),
-                            ),
-                          ],
                         ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -243,239 +393,259 @@ class _HomePageState extends State<HomePage> {
             
             const SizedBox(height: 16),
             
-            // Recent Values Row
-            Row(
+            // Recent Analysis Cards
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Recent PH Card
-                Expanded(
-                  child: Card(
-                    elevation: 0,
-                    color: const Color(0xFFFEE2E2),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                const Text(
+                  'Recent Analysis',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                if (_isLoadingData)
+                  const Center(
+                    child: CircularProgressIndicator(),
+                  )
+                else if (_errorMessage != null)
+                  Center(
+                    child: Text(
+                      _errorMessage!,
+                      style: const TextStyle(color: Colors.red),
+                      textAlign: TextAlign.center,
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Recent PH',
-                            style: TextStyle(
-                              color: Color(0xFFEC4899),
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  )
+                else if (_waterQualityData.isEmpty)
+                  const Center(
+                    child: Text(
+                      'No recent water quality analysis available',
+                      textAlign: TextAlign.center,
+                    ),
+                  )
+                else
+                  Column(
+                    children: [
+                      // PH Card
+                      Card(
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        color: const Color(0xFFFEF2F2),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Row(
                             children: [
-                              const Text(
-                                '6',
-                                style: TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFEC4899).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(10),
                                 ),
-                              ),
-                              const Text('ph'),
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.arrow_forward,
+                                child: const Icon(
+                                  Icons.water_drop,
                                   color: Color(0xFFEC4899),
+                                  size: 20,
                                 ),
-                                onPressed: () {
-                                  Navigator.pushNamed(context, '/water_analysis');
-                                },
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'PH',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: Color(0xFFEC4899),
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      _waterQualityData.last['ph'].toString(),
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
-                ),
-                
-                const SizedBox(width: 16),
-                
-                // Recent TDS Card
-                Expanded(
-                  child: Card(
-                    elevation: 0,
-                    color: const Color(0xFFE0E7FF),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Recent TDS',
-                            style: TextStyle(
-                              color: Color(0xFF6366F1),
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      const SizedBox(height: 8),
+                      
+                      // TDS Card
+                      Card(
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        color: const Color(0xFFF0F0FF),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Row(
                             children: [
-                              const Text(
-                                '23',
-                                style: TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF6366F1).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(10),
                                 ),
-                              ),
-                              const Text('ppm'),
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.arrow_forward,
+                                child: const Icon(
+                                  Icons.water,
                                   color: Color(0xFF6366F1),
+                                  size: 20,
                                 ),
-                                onPressed: () {
-                                  Navigator.pushNamed(context, '/water_analysis');
-                                },
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'TDS',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: Color(0xFF6366F1),
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '${_waterQualityData.last['tds']} ppm',
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // Bottom Cards Row
-            Row(
-              children: [
-                // Filter Replacement Card
-                Expanded(
-                  child: Card(
-                    elevation: 0,
-                    color: const Color(0xFFE0E7FF),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Filter Replacement',
-                            style: TextStyle(
-                              color: Color(0xFF6366F1),
-                              fontWeight: FontWeight.w500,
+                      const SizedBox(height: 8),
+                      
+                      // Turbidity Card
+                      if (_latestTurbidityData != null)
+                        Card(
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          color: const Color(0xFFE0F2FE),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0EA5E9).withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Icon(
+                                    Icons.opacity,
+                                    color: Color(0xFF0EA5E9),
+                                    size: 20,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Turbidity',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: Color(0xFF0EA5E9),
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        _latestTurbidityData!['confidence_display'],
+                                        style: const TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Estimate Date',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.black54,
-                                    ),
-                                  ),
-                                  SizedBox(height: 4),
-                                  Text(
-                                    '22/09/2025',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.arrow_forward,
-                                  color: Color(0xFF6366F1),
-                                ),
-                                onPressed: () {
-                                  Navigator.pushNamed(context, '/filter_prediction');
-                                },
-                              ),
-                            ],
+                        ),
+                      if (_latestTurbidityData != null)
+                        const SizedBox(height: 8),
+                      
+                      // Filter Replacement Card
+                      if (_latestFilterPrediction != null)
+                        Card(
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                
-                const SizedBox(width: 16),
-                
-                // Reminder Card
-                Expanded(
-                  child: Card(
-                    elevation: 0,
-                    color: const Color(0xFFDCFCE7),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Reminder',
-                            style: TextStyle(
-                              color: Color(0xFF10B981),
-                              fontWeight: FontWeight.w500,
+                          color: const Color(0xFFDCFCE7),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF10B981).withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Icon(
+                                    Icons.filter_alt,
+                                    color: Color(0xFF10B981),
+                                    size: 20,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Filter Replacement',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: Color(0xFF10B981),
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        '${_filterPredictionService.formatDate(_latestFilterPrediction!['replacementDate'])} (${_latestFilterPrediction!['daysUntilReplacement']} days)',
+                                        style: const TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '1 Cup of Water',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.black54,
-                                    ),
-                                  ),
-                                  SizedBox(height: 4),
-                                  Text(
-                                    '8:00 AM',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.arrow_forward,
-                                  color: Color(0xFF10B981),
-                                ),
-                                onPressed: () {
-                                  Navigator.pushNamed(context, '/water_intake_reminder');
-                                },
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
+                        ),
+                    ],
                   ),
-                ),
               ],
             ),
           ],

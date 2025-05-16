@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:water_quality_analysis/class/notification.dart';
 
 // Import all screen files
 import 'pages/welcome_page.dart';
@@ -16,21 +17,37 @@ import 'pages/water_analysis_result_page.dart';
 import 'pages/water_turbidity_page.dart';
 import 'pages/filter_search_page.dart';
 import 'pages/reminder_page.dart';
-import 'pages/set_reminder_page.dart';
+import 'pages/add_reminder_page.dart';
 import 'pages/water_intake_reminder_page.dart';
-
-// void main() {
-//   runApp(const WaterQualityApp());
-// }
+import 'pages/water_analysis_history.dart';
+import 'pages/water_turbidity_history.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(); // Ensure Firebase is initialized
-  runApp(WaterQualityApp());
+  
+  // Initialize Firebase
+  await Firebase.initializeApp();
+  
+  // Initialize notifications
+  await NotificationService.initialize();
+  
+  // Initialize the app
+  runApp(const WaterQualityApp());
 }
 
-class WaterQualityApp extends StatelessWidget {
+class WaterQualityApp extends StatefulWidget {
   const WaterQualityApp({Key? key}) : super(key: key);
+
+  @override
+  _WaterQualityAppState createState() => _WaterQualityAppState();
+}
+
+class _WaterQualityAppState extends State<WaterQualityApp> {
+  @override
+  void initState() {
+    super.initState();
+    // No need to initialize notifications here as it's now handled in main()
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -91,8 +108,10 @@ class WaterQualityApp extends StatelessWidget {
         '/water_turbidity': (context) => const WaterTurbidityPage(),
         '/filter_search': (context) => const FilterSearchPage(),
         '/reminder': (context) => const ReminderPage(),
-        '/set_reminder': (context) => const SetReminderPage(),
+        '/add_reminder': (context) => const AddReminderPage(),
         '/water_intake_reminder': (context) => const WaterIntakeReminderPage(),
+        '/water_analysis_history': (context) => const WaterAnalysisHistoryPage(),
+        '/water_turbidity_history': (context) => const WaterTurbidityHistoryPage(),
       },
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
@@ -131,10 +150,10 @@ class BottomNavBar extends StatelessWidget {
             Navigator.pushReplacementNamed(context, '/filter_search');
             break;
           case 3:
-            Navigator.pushReplacementNamed(context, '/filter_prediction');
+            Navigator.pushReplacementNamed(context, '/reminder');
             break;
           case 4:
-            Navigator.pushReplacementNamed(context, '/water_intake_reminder');
+            Navigator.pushReplacementNamed(context, '/profile');
             break;
         }
       },
@@ -152,12 +171,12 @@ class BottomNavBar extends StatelessWidget {
           label: 'Search',
         ),
         BottomNavigationBarItem(
-          icon: Icon(Icons.filter_alt_outlined),
-          label: 'Check Filter',
-        ),
-        BottomNavigationBarItem(
           icon: Icon(Icons.access_time_outlined),
           label: 'Reminder',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.person_outline),
+          label: 'Profile',
         ),
       ],
     );

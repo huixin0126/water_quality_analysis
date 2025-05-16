@@ -41,10 +41,10 @@ class _WaterIntakeReminderPageState extends State<WaterIntakeReminderPage> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        // leading: IconButton(
+        //   icon: const Icon(Icons.arrow_back, color: Colors.black),
+        //   onPressed: () => Navigator.of(context).pop(),
+        // ),
         title: const Text(
           'Water Intake Reminder',
           style: TextStyle(color: Colors.black, fontWeight: FontWeight.w600),
@@ -76,7 +76,7 @@ class _WaterIntakeReminderPageState extends State<WaterIntakeReminderPage> {
         ],
       ),
       // Use the existing BottomNavBar component from main.dart
-      bottomNavigationBar: const BottomNavBar(currentIndex: 4),
+      bottomNavigationBar: const BottomNavBar(currentIndex: 3),
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 60),
         child: SizedBox(

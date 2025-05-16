@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../main.dart';
 import '../services/water_analysis_firestore_service.dart';
 import 'package:intl/intl.dart';
+import 'filter_prediction_page.dart'; // Make sure to import this
 
 class WaterAnalysisResultPage extends StatefulWidget {
   const WaterAnalysisResultPage({Key? key}) : super(key: key);
@@ -262,10 +263,22 @@ class _WaterAnalysisResultPageState extends State<WaterAnalysisResultPage> {
                         
                         const SizedBox(width: 16),
                         
-                        // Check Filter Button
+                        // Check Filter Button - UPDATED METHOD
                         ElevatedButton(
                           onPressed: () {
-                            Navigator.pushNamed(context, '/filter_prediction');
+                            // Use MaterialPageRoute directly to pass the water parameters
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => FilterPredictionPage(
+                                  initialParams: {
+                                    'ph': ph,
+                                    'tds': tds,
+                                    'turbidity': turbidity,
+                                  },
+                                ),
+                              ),
+                            );
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: isPotable 

@@ -17,13 +17,14 @@ class WaterAnalysisFirestoreService {
     double? turbidity,
   }) async {
     try {
+      print('User ID: $_userId');
       // Check if user is logged in
       if (_userId == null) {
         throw Exception('User not logged in');
       }
 
       // Create a new document reference
-      final docRef = _firestore.collection('users').doc(_userId).collection('water_analyses').doc();
+      final docRef = _firestore.collection('users').doc(_userId).collection('water_analysis').doc();
       
       // Data to save
       final data = {
@@ -41,9 +42,11 @@ class WaterAnalysisFirestoreService {
       
       // Return the document ID for reference
       return docRef.id;
-    } catch (e) {
-      throw Exception('Failed to save water analysis result: ${e.toString()}');
-    }
+    } catch (e, stacktrace) {
+    print('Save Error: $e');
+    print('StackTrace: $stacktrace');
+    throw Exception('Failed to save water analysis result: ${e.toString()}');
+  }
   }
 
   // Get water analysis result by ID
