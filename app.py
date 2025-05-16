@@ -23,35 +23,26 @@ def predict():
         # Get the data from the POST request
         data = request.get_json(force=True)
         
-        # Extract required values
+        # Extract values
         ph = float(data['ph'])
-        solids = float(data['solids'])
-        
-        # Extract optional values with defaults
-        hardness = float(data.get('hardness', 0))
-        chloramines = float(data.get('chloramines', 0))
-        sulfate = float(data.get('sulfate', 0))
-        conductivity = float(data.get('conductivity', 0))
-        organic_carbon = float(data.get('organic_carbon', 0))
-        trihalomethanes = float(data.get('trihalomethanes', 0))
-        turbidity = float(data.get('turbidity', 0))
+        tds = float(data['tds'])
         
         # Input validation
         if ph < 0 or ph > 14:
             return jsonify({'error': 'pH must be between 0 and 14'}), 400
         
-        if solids < 0:
-            return jsonify({'error': 'Solids cannot be negative'}), 400
+        if tds < 0:
+            return jsonify({'error': 'TDS cannot be negative'}), 400
         
         # If model failed to load, use simple logic
         if model is None or scaler is None:
             # Simplified logic when model not available
             is_good_ph = 6.5 <= ph <= 8.5
-            is_good_solids = solids < 500
+            is_good_tds = tds < 500
             
-            if is_good_ph and is_good_solids:
+            if is_good_ph and is_good_tds:
                 potable_prob = 85.0
-            elif is_good_ph or is_good_solids:
+            elif is_good_ph or is_good_tds:
                 potable_prob = 60.0
             else:
                 potable_prob = 30.0
@@ -63,23 +54,22 @@ def predict():
             })
         
         # Prepare input for the model
-        user_input = np.array([[
-            ph, solids, hardness, chloramines, sulfate,
-            conductivity, organic_carbon, trihalomethanes, turbidity
-        ]])
+        user_input = np.array([[ph, tds]])
         
         # Scale the input
         user_scaled = scaler.transform(user_input)
         
-        # Make prediction
-        prediction = model.predict(user_scaled)[0]
-        probability = model.predict_proba(user_scaled)[0][1] * 100
+        # Get prediction probabilities
+        proba = model.predict_proba(user_scaled)
         
-        return jsonify({
-            'potable_probability': float(probability),
-            'not_potable_probability': float(100 - probability),
-            'is_potable': bool(prediction == 1)
-        })
+        # Prepare response
+        response = {
+            'potable_probability': float(proba[0][1] * 100),
+            'not_potable_probability': float(proba[0][0] * 100),
+            'is_potable': bool(proba[0][1] > 0.5)
+        }
+        
+        return jsonify(response)
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
