@@ -8,10 +8,10 @@ CORS(app)  # Enable CORS for all routes
 
 # Load the saved models and scalers
 try:
-    model_2features = pickle.load(open('water_potability_model_2features.pkl', 'rb'))
-    scaler_2features = pickle.load(open('water_potability_scaler_2features.pkl', 'rb'))
-    model_9features = pickle.load(open('water_potability_model_9features.pkl', 'rb'))
-    scaler_9features = pickle.load(open('water_potability_scaler_9features.pkl', 'rb'))
+    model_2features = pickle.load(open('water_potability_model_2features_optimized.pkl', 'rb'))
+    scaler_2features = pickle.load(open('water_potability_scaler_2features_optimized.pkl', 'rb'))
+    model_9features = pickle.load(open('water_potability_model_9features_optimized.pkl', 'rb'))
+    scaler_9features = pickle.load(open('water_potability_scaler_9features_optimized.pkl', 'rb'))
     print("Models and scalers loaded successfully!")
 except Exception as e:
     print(f"Error loading models or scalers: {e}")
