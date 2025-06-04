@@ -52,7 +52,6 @@ dependencies:
   timezone: ^0.9.4
   flutter_local_notifications: ^18.0.1
   url_launcher: ^6.3.1
-  flutter_facebook_auth: ^7.1.2
   # firebase_crashlytics: ^4.3.5
   # awesome_notifications_fcm: ^0.10.0
   # awesome_notifications_core: ^0.10.1

@@ -341,20 +341,6 @@ class _SignUpPageState extends State<SignUpPage> {
                   label: const Text('Sign up with Google'),
                 ),
                 
-                const SizedBox(height: 16),
-                
-                // Facebook Sign Up Button
-                ElevatedButton.icon(
-                  onPressed: () {
-                    // Handle Facebook sign up
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF3b5998),
-                  ),
-                  icon: const Icon(Icons.facebook, size: 24),
-                  label: const Text('Sign up with Facebook'),
-                ),
-                
                 const SizedBox(height: 24),
                 
                 // Sign In Link

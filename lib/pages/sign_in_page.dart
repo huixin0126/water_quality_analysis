@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 
 class SignInPage extends StatefulWidget {
   const SignInPage({Key? key}) : super(key: key);
@@ -207,90 +206,6 @@ class _SignInPageState extends State<SignInPage> {
     }
   }
 
-  // Sign in with Facebook
-  Future<void> _signInWithFacebook() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = '';
-    });
-
-    try {
-      // Trigger the Facebook Sign-In flow
-      final LoginResult result = await FacebookAuth.instance.login();
-      
-      if (result.status == LoginStatus.success) {
-        // Get the access token
-        final AccessToken accessToken = result.accessToken!;
-        
-        // Create a credential from the access token
-        final OAuthCredential credential = FacebookAuthProvider.credential(accessToken.tokenString);        
-        // Sign in to Firebase with the Facebook credential
-        UserCredential userCredential = await _auth.signInWithCredential(credential);
-        
-        // Check if this is a new user
-        bool isNewUser = userCredential.additionalUserInfo?.isNewUser ?? false;
-        
-        // Get user data
-        User? user = userCredential.user;
-        
-        if (user != null) {
-          // Get additional user data from Facebook
-          final userData = await FacebookAuth.instance.getUserData();
-          
-          // Reference to the user document
-          DocumentReference userRef = _firestore.collection('users').doc(user.uid);
-          
-          if (isNewUser) {
-            // Create a new user document
-            await userRef.set({
-              'email': user.email,
-              'displayName': user.displayName ?? userData['name'],
-              'photoURL': user.photoURL ?? userData['picture']?['data']?['url'],
-              'createdAt': FieldValue.serverTimestamp(),
-              'lastLogin': FieldValue.serverTimestamp(),
-              'provider': 'facebook',
-            });
-          } else {
-            // Update existing user information
-            await userRef.update({
-              'lastLogin': FieldValue.serverTimestamp(),
-              'displayName': user.displayName ?? userData['name'],
-              'photoURL': user.photoURL ?? userData['picture']?['data']?['url'],
-            }).catchError((error) {
-              print("Updating user document failed: $error");
-              return userRef.set({
-                'email': user.email,
-                'displayName': user.displayName ?? userData['name'],
-                'photoURL': user.photoURL ?? userData['picture']?['data']?['url'],
-                'createdAt': FieldValue.serverTimestamp(),
-                'lastLogin': FieldValue.serverTimestamp(),
-                'provider': 'facebook',
-              });
-            });
-          }
-          
-          // Navigate to home page
-          if (mounted) {
-            Navigator.pushReplacementNamed(context, '/home');
-          }
-        }
-      } else {
-        setState(() {
-          _errorMessage = 'Facebook login failed';
-        });
-      }
-    } catch (e) {
-      print("Facebook sign in error: $e");
-      setState(() {
-        _errorMessage = 'Failed to sign in with Facebook: $e';
-      });
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
   // Handle forgot password
   Future<void> _resetPassword() async {
     if (_emailController.text.isEmpty) {
@@ -455,18 +370,6 @@ class _SignInPageState extends State<SignInPage> {
                   ),
                   icon: const Icon(Icons.g_mobiledata, size: 24),
                   label: const Text('Continue with Google'),
-                ),
-                
-                const SizedBox(height: 16),
-                
-                // Facebook Sign In Button
-                ElevatedButton.icon(
-                  onPressed: _isLoading ? null : _signInWithFacebook,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1877F2),
-                  ),
-                  icon: const Icon(Icons.facebook, size: 24),
-                  label: const Text('Continue with Facebook'),
                 ),
                 
                 const SizedBox(height: 24),
