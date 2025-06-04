@@ -116,6 +116,8 @@ class _WaterAnalysisHistoryPageState extends State<WaterAnalysisHistoryPage> {
     final ph = analysis['ph']?.toStringAsFixed(2) ?? 'N/A';
     final tds = analysis['tds']?.toStringAsFixed(2) ?? 'N/A';
     final formattedDate = _formatTimestamp(analysis['timestamp']);
+    final modelType = analysis['model_type'] ?? '2features';
+    final potableProbability = analysis['potable_probability']?.toStringAsFixed(1) ?? 'N/A';
     
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -140,117 +142,122 @@ class _WaterAnalysisHistoryPageState extends State<WaterAnalysisHistoryPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Date and status row
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    formattedDate,
-                    style: const TextStyle(
-                      color: Colors.grey,
-                      fontSize: 12,
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: isPotable ? Colors.green.shade50 : Colors.red.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      isPotable ? 'Potable' : 'Not Potable',
-                      style: TextStyle(
-                        color: isPotable ? Colors.green.shade700 : Colors.red.shade700,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isPotable ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          isPotable ? 'Clean' : 'Not Clean',
+                          style: TextStyle(
+                            color: isPotable ? Colors.green : Colors.red,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
                       ),
-                    ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          modelType == '2features' ? 'Basic' : 'Advanced',
+                          style: const TextStyle(
+                            color: Colors.blue,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, color: Colors.red),
+                    onPressed: () => _deleteAnalysis(analysis['id']),
                   ),
                 ],
               ),
-              
               const SizedBox(height: 12),
-              
-              // Parameters row
-              Row(
-                children: [
-                  _buildParameterChip(Icons.opacity, 'pH', ph),
-                  const SizedBox(width: 12),
-                  _buildParameterChip(Icons.water_drop, 'TDS', '$tds mg/L'),
-                ],
+              Text(
+                formattedDate,
+                style: const TextStyle(
+                  color: Colors.grey,
+                  fontSize: 14,
+                ),
               ),
-              
               const SizedBox(height: 12),
-              
-              // Actions row
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // View details button
-                  TextButton.icon(
-                    onPressed: () {
-                      Navigator.pushNamed(
-                        context,
-                        '/water_analysis_result',
-                        arguments: {
-                          'analysis_id': analysis['id'],
-                        },
-                      ).then((_) => _loadAnalysisHistory());
-                    },
-                    icon: const Icon(Icons.visibility_outlined, size: 16),
-                    label: const Text('View Details'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFF6366F1),
-                    ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'pH',
+                        style: TextStyle(
+                          color: Colors.grey,
+                          fontSize: 14,
+                        ),
+                      ),
+                      Text(
+                        ph,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ),
-                  
-                  // Delete button
-                  IconButton(
-                    onPressed: () => _deleteAnalysis(analysis['id']),
-                    icon: const Icon(Icons.delete_outline, color: Colors.red),
-                    tooltip: 'Delete',
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'TDS',
+                        style: TextStyle(
+                          color: Colors.grey,
+                          fontSize: 14,
+                        ),
+                      ),
+                      Text(
+                        '$tds mg/L',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Probability',
+                        style: TextStyle(
+                          color: Colors.grey,
+                          fontSize: 14,
+                        ),
+                      ),
+                      Text(
+                        '$potableProbability%',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: isPotable ? Colors.green : Colors.red,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildParameterChip(IconData icon, String label, String value) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF3F4F6),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, size: 16, color: Colors.grey),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey,
-                  ),
-                ),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ],
         ),
       ),
     );

@@ -15,6 +15,14 @@ class WaterAnalysisFirestoreService {
     required double potableProbability,
     required bool isPotable,
     double? turbidity,
+    double? hardness,
+    double? solids,
+    double? chloramines,
+    double? sulfate,
+    double? conductivity,
+    double? organic_carbon,
+    double? trihalomethanes,
+    String? modelType = '2features',
   }) async {
     try {
       print('User ID: $_userId');
@@ -35,6 +43,14 @@ class WaterAnalysisFirestoreService {
         'not_potable_probability': 100 - potableProbability,
         'is_potable': isPotable,
         'turbidity': turbidity,
+        'hardness': hardness,
+        'solids': solids,
+        'chloramines': chloramines,
+        'sulfate': sulfate,
+        'conductivity': conductivity,
+        'organic_carbon': organic_carbon,
+        'trihalomethanes': trihalomethanes,
+        'model_type': modelType,
       };
 
       // Save the data
@@ -43,10 +59,10 @@ class WaterAnalysisFirestoreService {
       // Return the document ID for reference
       return docRef.id;
     } catch (e, stacktrace) {
-    print('Save Error: $e');
-    print('StackTrace: $stacktrace');
-    throw Exception('Failed to save water analysis result: ${e.toString()}');
-  }
+      print('Save Error: $e');
+      print('StackTrace: $stacktrace');
+      throw Exception('Failed to save water analysis result: ${e.toString()}');
+    }
   }
 
   // Get water analysis result by ID
