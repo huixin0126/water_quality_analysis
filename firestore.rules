@@ -1,0 +1,27 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Allow users to read/write their own user document
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      // Allow user to access their own subcollections like water_analysis
+      match /{subCollection=**}/{docId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+    // Allow users to read and write only their own reminders
+    match /reminders/{reminderId} {
+      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+    }
+
+    // Allow read access to filters collection for authenticated users
+    match /filters/{filterId} {
+      allow read: if request.auth != null;
+      allow write: if false; // Only allow writes through admin/backend
+    }
+  }
+} 
