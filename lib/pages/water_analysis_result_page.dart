@@ -24,6 +24,8 @@ class _WaterAnalysisResultPageState extends State<WaterAnalysisResultPage> {
   }
 
   Future<void> _loadData() async {
+    if (!mounted) return;
+    
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -41,10 +43,14 @@ class _WaterAnalysisResultPageState extends State<WaterAnalysisResultPage> {
       // Fetch the data from Firestore
       _analysisData = await _firestoreService.getWaterAnalysisResult(analysisId);
       
+      if (!mounted) return;
+      
       setState(() {
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
+      
       setState(() {
         _isLoading = false;
         _errorMessage = e.toString();

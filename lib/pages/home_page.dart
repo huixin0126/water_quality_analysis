@@ -203,7 +203,7 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -215,7 +215,7 @@ class _HomePageState extends State<HomePage> {
               ),
               color: Colors.white,
               child: Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -252,8 +252,8 @@ class _HomePageState extends State<HomePage> {
                           alignment: Alignment.center,
                           children: [
                             SizedBox(
-                              width: 200,
-                              height: 200,
+                              width: 180,
+                              height: 180,
                               child: CircularProgressIndicator(
                                 value: _calculateWaterQualityScore() / 100,
                                 strokeWidth: 20,
@@ -273,7 +273,7 @@ class _HomePageState extends State<HomePage> {
                                 Text(
                                   '${_calculateWaterQualityScore().toStringAsFixed(1)}%',
                                   style: TextStyle(
-                                    fontSize: 36,
+                                    fontSize: 32,
                                     fontWeight: FontWeight.bold,
                                     color: _calculateWaterQualityScore() >= 70
                                         ? const Color(0xFF10B981)
@@ -289,7 +289,7 @@ class _HomePageState extends State<HomePage> {
                                           ? 'Fair'
                                           : 'Poor',
                                   style: TextStyle(
-                                    fontSize: 16,
+                                    fontSize: 14,
                                     color: _calculateWaterQualityScore() >= 70
                                         ? const Color(0xFF10B981)
                                         : _calculateWaterQualityScore() >= 40
@@ -468,6 +468,7 @@ class _HomePageState extends State<HomePage> {
                               bottomTitles: AxisTitles(
                                 sideTitles: SideTitles(
                                   showTitles: true,
+                                  reservedSize: 30,
                                   getTitlesWidget: (value, meta) {
                                     if (value >= 0 && value < _dateLabels.length) {
                                       return Padding(
@@ -489,14 +490,27 @@ class _HomePageState extends State<HomePage> {
                               leftTitles: AxisTitles(
                                 sideTitles: SideTitles(
                                   showTitles: true,
+                                  reservedSize: 40,
                                   getTitlesWidget: (value, meta) {
-                                    return Text(
-                                      value.toInt().toString(),
-                                      style: const TextStyle(
-                                        fontSize: 10,
-                                        color: Colors.grey,
-                                      ),
-                                    );
+                                    if (meta.axisIndex == 0) {
+                                      // TDS values
+                                      return Text(
+                                        '${value.toInt()}',
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.grey,
+                                        ),
+                                      );
+                                    } else {
+                                      // pH values
+                                      return Text(
+                                        value.toStringAsFixed(1),
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.grey,
+                                        ),
+                                      );
+                                    }
                                   },
                                   interval: 2,
                                 ),
@@ -509,6 +523,10 @@ class _HomePageState extends State<HomePage> {
                               ),
                             ),
                             borderData: FlBorderData(show: false),
+                            minX: 0,
+                            maxX: (_dateLabels.length - 1).toDouble(),
+                            minY: 0,
+                            maxY: 1000, // Max value for TDS
                             lineBarsData: [
                               // TDS Line
                               LineChartBarData(
