@@ -43,7 +43,7 @@ class WaterPotabilityService {
     required double chloramines,
     required double sulfate,
     required double conductivity,
-    required double organicCarbon,
+    required double organic_carbon,
     required double trihalomethanes,
   }) async {
     try {
@@ -58,7 +58,7 @@ class WaterPotabilityService {
           'chloramines': chloramines,
           'sulfate': sulfate,
           'conductivity': conductivity,
-          'organic_carbon': organicCarbon,
+          'organic_carbon': organic_carbon,
           'trihalomethanes': trihalomethanes,
         }),
       );
@@ -80,7 +80,7 @@ class WaterPotabilityService {
         chloramines: chloramines,
         sulfate: sulfate,
         conductivity: conductivity,
-        organicCarbon: organicCarbon,
+        organicCarbon: organic_carbon,
         trihalomethanes: trihalomethanes,
       );
     }

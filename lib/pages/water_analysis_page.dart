@@ -192,7 +192,7 @@ class _WaterAnalysisPageState extends State<WaterAnalysisPage> with SingleTicker
         chloramines: chloramines,
         sulfate: sulfate,
         conductivity: conductivity,
-        organicCarbon: organicCarbon,
+        organic_carbon: organicCarbon,
         trihalomethanes: trihalomethanes,
       );
 
@@ -206,7 +206,7 @@ class _WaterAnalysisPageState extends State<WaterAnalysisPage> with SingleTicker
         chloramines: chloramines,
         sulfate: sulfate,
         conductivity: conductivity,
-        organicCarbon: organicCarbon,
+        organic_carbon: organicCarbon,
         trihalomethanes: trihalomethanes,
         modelType: '9features',
       );
