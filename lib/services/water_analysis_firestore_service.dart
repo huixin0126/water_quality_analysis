@@ -15,14 +15,8 @@ class WaterAnalysisFirestoreService {
     required double potableProbability,
     required bool isPotable,
     double? turbidity,
-    double? hardness,
-    double? solids,
-    double? chloramines,
-    double? sulfate,
-    double? conductivity,
-    double? organic_carbon,
-    double? trihalomethanes,
-    String? modelType = '2features',
+    String? analysisType = '2features',
+    Map<String, double>? additionalParams,
   }) async {
     try {
       print('User ID: $_userId');
@@ -43,15 +37,13 @@ class WaterAnalysisFirestoreService {
         'not_potable_probability': 100 - potableProbability,
         'is_potable': isPotable,
         'turbidity': turbidity,
-        'hardness': hardness,
-        'solids': solids,
-        'chloramines': chloramines,
-        'sulfate': sulfate,
-        'conductivity': conductivity,
-        'organic_carbon': organic_carbon,
-        'trihalomethanes': trihalomethanes,
-        'model_type': modelType,
+        'analysis_type': analysisType,
       };
+
+      // Add additional parameters if provided (for 9-feature analysis)
+      if (additionalParams != null) {
+        data.addAll(additionalParams);
+      }
 
       // Save the data
       await docRef.set(data);

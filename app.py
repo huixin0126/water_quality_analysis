@@ -99,8 +99,8 @@ def predict_9features():
         if ph < 0 or ph > 14:
             return jsonify({'error': 'pH must be between 0 and 14'}), 400
         
-        if any(x < 0 for x in [tds, hardness, solids, chloramines, sulfate, conductivity, organic_carbon, trihalomethanes]):
-            return jsonify({'error': 'All values must be non-negative'}), 400
+        if any(value < 0 for value in [tds, hardness, solids, chloramines, sulfate, conductivity, organic_carbon, trihalomethanes]):
+            return jsonify({'error': 'All parameters must be non-negative'}), 400
         
         # If model failed to load, use simple logic
         if model_9features is None or scaler_9features is None:
@@ -112,16 +112,17 @@ def predict_9features():
             is_good_chloramines = 2 <= chloramines <= 4
             is_good_sulfate = sulfate < 250
             is_good_conductivity = conductivity < 500
-            is_good_organic_carbon = organic_carbon < 3
+            is_good_organic_carbon = organic_carbon < 2.5
             is_good_trihalomethanes = trihalomethanes < 80
             
-            good_parameters = sum([
+            # Count good parameters
+            good_params = sum([
                 is_good_ph, is_good_tds, is_good_hardness, is_good_solids,
                 is_good_chloramines, is_good_sulfate, is_good_conductivity,
                 is_good_organic_carbon, is_good_trihalomethanes
             ])
             
-            potable_prob = (good_parameters / 9) * 100
+            potable_prob = (good_params / 9) * 100
             
             # Adjust probability based on critical parameters
             if not is_good_ph or not is_good_tds:
@@ -135,8 +136,8 @@ def predict_9features():
         
         # Prepare input for the model
         user_input = np.array([[
-            ph, tds, hardness, solids, chloramines,
-            sulfate, conductivity, organic_carbon, trihalomethanes
+            ph, hardness, solids, chloramines, sulfate, conductivity,
+            organic_carbon, trihalomethanes, tds
         ]])
         
         # Scale the input

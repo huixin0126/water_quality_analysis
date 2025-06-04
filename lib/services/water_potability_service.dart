@@ -35,32 +35,12 @@ class WaterPotabilityService {
 
   /// Predicts water potability based on 9 features
   /// Returns a Map with potability probability and results
-  Future<Map<String, dynamic>> predictPotability9Features({
-    required double ph,
-    required double tds,
-    required double hardness,
-    required double solids,
-    required double chloramines,
-    required double sulfate,
-    required double conductivity,
-    required double organic_carbon,
-    required double trihalomethanes,
-  }) async {
+  Future<Map<String, dynamic>> predictPotability9Features(Map<String, double> params) async {
     try {
       final response = await http.post(
         Uri.parse('$apiUrl/predict_9features'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'ph': ph,
-          'tds': tds,
-          'hardness': hardness,
-          'solids': solids,
-          'chloramines': chloramines,
-          'sulfate': sulfate,
-          'conductivity': conductivity,
-          'organic_carbon': organic_carbon,
-          'trihalomethanes': trihalomethanes,
-        }),
+        body: jsonEncode(params),
       );
       
       if (response.statusCode == 200) {
@@ -72,17 +52,7 @@ class WaterPotabilityService {
       // For quick testing when API is not available, return mock data
       // Remove this in production and handle errors properly
       print('Error connecting to API: $e');
-      return _getMockPrediction9Features(
-        ph: ph,
-        tds: tds,
-        hardness: hardness,
-        solids: solids,
-        chloramines: chloramines,
-        sulfate: sulfate,
-        conductivity: conductivity,
-        organicCarbon: organic_carbon,
-        trihalomethanes: trihalomethanes,
-      );
+      return _getMockPrediction9Features(params);
     }
   }
   
@@ -113,44 +83,33 @@ class WaterPotabilityService {
     };
   }
 
-  // Mock prediction for 9 features testing without an API
-  Map<String, dynamic> _getMockPrediction9Features({
-    required double ph,
-    required double tds,
-    required double hardness,
-    required double solids,
-    required double chloramines,
-    required double sulfate,
-    required double conductivity,
-    required double organicCarbon,
-    required double trihalomethanes,
-  }) {
+  // Mock prediction for 9-feature analysis
+  Map<String, dynamic> _getMockPrediction9Features(Map<String, double> params) {
     // Simple logic to mimic the model prediction
-    bool isGoodPh = ph >= 6.5 && ph <= 8.5;
-    bool isGoodTds = tds < 500;
-    bool isGoodHardness = hardness >= 150 && hardness <= 300;
-    bool isGoodSolids = solids < 500;
-    bool isGoodChloramines = chloramines >= 2 && chloramines <= 4;
-    bool isGoodSulfate = sulfate < 250;
-    bool isGoodConductivity = conductivity < 500;
-    bool isGoodOrganicCarbon = organicCarbon < 3;
-    bool isGoodTrihalomethanes = trihalomethanes < 80;
+    bool isGoodPh = params['ph']! >= 6.5 && params['ph']! <= 8.5;
+    bool isGoodTds = params['tds']! < 500;
+    bool isGoodHardness = params['hardness']! >= 150 && params['hardness']! <= 300;
+    bool isGoodSolids = params['solids']! < 500;
+    bool isGoodChloramines = params['chloramines']! >= 2 && params['chloramines']! <= 4;
+    bool isGoodSulfate = params['sulfate']! < 250;
+    bool isGoodConductivity = params['conductivity']! < 500;
+    bool isGoodOrganicCarbon = params['organic_carbon']! < 2.5;
+    bool isGoodTrihalomethanes = params['trihalomethanes']! < 80;
     
-    double potableProbability = 0.0;
-    int goodParameters = 0;
-    
-    if (isGoodPh) goodParameters++;
-    if (isGoodTds) goodParameters++;
-    if (isGoodHardness) goodParameters++;
-    if (isGoodSolids) goodParameters++;
-    if (isGoodChloramines) goodParameters++;
-    if (isGoodSulfate) goodParameters++;
-    if (isGoodConductivity) goodParameters++;
-    if (isGoodOrganicCarbon) goodParameters++;
-    if (isGoodTrihalomethanes) goodParameters++;
+    // Count good parameters
+    int goodParams = 0;
+    if (isGoodPh) goodParams++;
+    if (isGoodTds) goodParams++;
+    if (isGoodHardness) goodParams++;
+    if (isGoodSolids) goodParams++;
+    if (isGoodChloramines) goodParams++;
+    if (isGoodSulfate) goodParams++;
+    if (isGoodConductivity) goodParams++;
+    if (isGoodOrganicCarbon) goodParams++;
+    if (isGoodTrihalomethanes) goodParams++;
     
     // Calculate probability based on number of good parameters
-    potableProbability = (goodParameters / 9) * 100;
+    double potableProbability = (goodParams / 9) * 100;
     
     // Adjust probability based on critical parameters
     if (!isGoodPh || !isGoodTds) {

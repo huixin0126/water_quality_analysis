@@ -124,7 +124,7 @@ class _WaterAnalysisResultPageState extends State<WaterAnalysisResultPage> {
     final bool isPotable = _analysisData['is_potable'] ?? false;
     final double ph = _analysisData['ph'] ?? 7.0;
     final double tds = _analysisData['tds'] ?? 0.0;
-    final String modelType = _analysisData['model_type'] ?? '2features';
+    final String analysisType = _analysisData['analysis_type'] ?? '2features';
     
     // Format timestamp (if available)
     String timestampText = 'N/A';
@@ -142,109 +142,168 @@ class _WaterAnalysisResultPageState extends State<WaterAnalysisResultPage> {
     
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Analysis Results'),
+        title: const Text('Water Analysis Result'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.pop(context);
+          },
+        ),
+        actions: [
+          // Share button
+          IconButton(
+            icon: const Icon(Icons.share),
+            onPressed: () {
+              // Implement share functionality here
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Share functionality coming soon')),
+              );
+            },
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Result Card
-            Card(
-              elevation: 4,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+            // Timestamp display
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                'Analyzed: $timestampText',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey,
+                ),
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
+            ),
+            
+            const SizedBox(height: 8),
+            
+            // Main Result Card
+            Card(
+              elevation: 1,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Padding( 
+                padding: const EdgeInsets.all(24),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Row(
+                    // Progress Indicator
+                    Stack(
+                      alignment: Alignment.center,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: resultColor.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            isPotable ? Icons.check_circle : Icons.warning,
-                            color: resultColor,
-                            size: 32,
+                        SizedBox(
+                          width: 160,
+                          height: 160,
+                          child: CircularProgressIndicator(
+                            value: potableProbability / 100,
+                            strokeWidth: 20,
+                            backgroundColor: const Color(0xFFF3F4F6),
+                            valueColor: AlwaysStoppedAnimation<Color>(resultColor),
                           ),
                         ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                resultText,
-                                style: TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                  color: resultColor,
-                                ),
-                              ),
-                              Text(
-                                'Analysis completed at $timestampText',
-                                style: const TextStyle(
-                                  color: Colors.grey,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
-                      resultDescription,
-                      style: const TextStyle(fontSize: 16),
-                    ),
-                    const SizedBox(height: 24),
-                    // Probability Bar
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Potability Probability',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        LinearProgressIndicator(
-                          value: potableProbability / 100,
-                          backgroundColor: Colors.grey[200],
-                          valueColor: AlwaysStoppedAnimation<Color>(resultColor),
-                          minHeight: 8,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        const SizedBox(height: 8),
                         Text(
                           '${potableProbability.toStringAsFixed(1)}%',
                           style: TextStyle(
-                            fontSize: 16,
+                            fontSize: 36,
                             fontWeight: FontWeight.bold,
                             color: resultColor,
                           ),
                         ),
                       ],
                     ),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // Result Text
+                    Text(
+                      resultText,
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: resultColor,
+                      ),
+                    ),
+                    
+                    const SizedBox(height: 16),
+                    
+                    // Description
+                    Text(
+                      resultDescription,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.black54,
+                      ),
+                    ),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // Buttons
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // Dismiss Button
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.grey[200],
+                            foregroundColor: Colors.black,
+                            minimumSize: const Size(100, 40),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: const Text('Dismiss'),
+                        ),
+                        
+                        const SizedBox(width: 16),
+                        
+                        ElevatedButton(
+                          onPressed: () {
+                            // Use MaterialPageRoute directly to pass the water parameters
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => FilterPredictionPage(
+                                  initialParams: {
+                                    'ph': ph,
+                                    'tds': tds,
+                                  },
+                                ),
+                              ),
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: isPotable 
+                                ? const Color(0xFFD1FAE5) 
+                                : const Color(0xFFFEE2E2),
+                            foregroundColor: resultColor,
+                            minimumSize: const Size(120, 40),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: const Text('Check Filter'),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 24),
+            
+            const SizedBox(height: 20),
+            
             // Parameters Card
             Card(
-              elevation: 4,
+              elevation: 1,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(12),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -252,61 +311,104 @@ class _WaterAnalysisResultPageState extends State<WaterAnalysisResultPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      modelType == '2features' ? 'Basic Parameters' : 'Water Parameters',
+                      'Water Parameters (${analysisType == '2features' ? '2 Features' : '9 Features'})',
                       style: const TextStyle(
-                        fontSize: 20,
+                        fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(height: 16),
-                    _buildParameterRow('pH', ph.toStringAsFixed(2)),
-                    _buildParameterRow('TDS', '${tds.toStringAsFixed(2)} mg/L'),
-                    if (modelType == '9features') ...[
-                      _buildParameterRow('Hardness', '${_analysisData['hardness']?.toStringAsFixed(2) ?? 'N/A'} mg/L'),
-                      _buildParameterRow('Solids', '${_analysisData['solids']?.toStringAsFixed(2) ?? 'N/A'} mg/L'),
-                      _buildParameterRow('Chloramines', '${_analysisData['chloramines']?.toStringAsFixed(2) ?? 'N/A'} mg/L'),
-                      _buildParameterRow('Sulfate', '${_analysisData['sulfate']?.toStringAsFixed(2) ?? 'N/A'} mg/L'),
-                      _buildParameterRow('Conductivity', '${_analysisData['conductivity']?.toStringAsFixed(2) ?? 'N/A'} µS/cm'),
-                      _buildParameterRow('Organic Carbon', '${_analysisData['organic_carbon']?.toStringAsFixed(2) ?? 'N/A'} mg/L'),
-                      _buildParameterRow('Trihalomethanes', '${_analysisData['trihalomethanes']?.toStringAsFixed(2) ?? 'N/A'} µg/L'),
+                    
+                    // pH Value
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'pH Level:',
+                          style: TextStyle(
+                            fontSize: 16,
+                          ),
+                        ),
+                        Text(
+                          ph.toStringAsFixed(2),
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: (ph >= 6.5 && ph <= 8.5) 
+                                ? const Color(0xFF10B981) 
+                                : const Color(0xFFF59E0B),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    
+                    // TDS Value
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'TDS (mg/L):',
+                          style: TextStyle(
+                            fontSize: 16,
+                          ),
+                        ),
+                        Text(
+                          tds.toStringAsFixed(0),
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: (tds < 500) 
+                                ? const Color(0xFF10B981) 
+                                : (tds < 1000) 
+                                    ? const Color(0xFFF59E0B) 
+                                    : const Color(0xFFEF4444),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    // Additional parameters for 9-feature analysis
+                    if (analysisType == '9features') ...[
+                      const SizedBox(height: 8),
+                      _buildParameterRow('Hardness (mg/L)', _analysisData['hardness'] ?? 0.0, 150, 300),
+                      const SizedBox(height: 8),
+                      _buildParameterRow('Solids (mg/L)', _analysisData['solids'] ?? 0.0, 0, 500),
+                      const SizedBox(height: 8),
+                      _buildParameterRow('Chloramines (mg/L)', _analysisData['chloramines'] ?? 0.0, 2, 4),
+                      const SizedBox(height: 8),
+                      _buildParameterRow('Sulfate (mg/L)', _analysisData['sulfate'] ?? 0.0, 0, 250),
+                      const SizedBox(height: 8),
+                      _buildParameterRow('Conductivity (µS/cm)', _analysisData['conductivity'] ?? 0.0, 0, 500),
+                      const SizedBox(height: 8),
+                      _buildParameterRow('Organic Carbon (mg/L)', _analysisData['organic_carbon'] ?? 0.0, 0, 2.5),
+                      const SizedBox(height: 8),
+                      _buildParameterRow('Trihalomethanes (µg/L)', _analysisData['trihalomethanes'] ?? 0.0, 0, 80),
                     ],
+                    
+                    const SizedBox(height: 16),
+                    
+                    // Recommendations
+                    const Text(
+                      'Recommendations:',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      isPotable
+                          ? '• Water is safe for consumption\n• Continue regular maintenance of your filtration system'
+                          : '• Water may not be safe for consumption\n• Check your filter condition\n• Consider additional treatment methods',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        height: 1.5,
+                      ),
+                    ),
                   ],
                 ),
               ),
-            ),
-            const SizedBox(height: 24),
-            // Action Buttons
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pushNamed(context, '/filter_prediction');
-                    },
-                    icon: const Icon(Icons.filter_alt),
-                    label: const Text('Check Filter Status'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF6366F1),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pushNamed(context, '/analysis');
-                    },
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('New Analysis'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey[200],
-                      foregroundColor: Colors.black87,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                  ),
-                ),
-              ],
             ),
           ],
         ),
@@ -315,28 +417,34 @@ class _WaterAnalysisResultPageState extends State<WaterAnalysisResultPage> {
     );
   }
 
-  Widget _buildParameterRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 16,
-              color: Colors.grey,
-            ),
+  Widget _buildParameterRow(String label, double value, double minGood, double maxGood) {
+    Color valueColor;
+    if (value < minGood) {
+      valueColor = const Color(0xFFF59E0B); // Warning color
+    } else if (value > maxGood) {
+      valueColor = const Color(0xFFEF4444); // Danger color
+    } else {
+      valueColor = const Color(0xFF10B981); // Good color
+    }
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 16,
           ),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-            ),
+        ),
+        Text(
+          value.toStringAsFixed(2),
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: valueColor,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

@@ -293,16 +293,68 @@ class _HomePageState extends State<HomePage> {
                     else
                       SizedBox(
                         height: 200,
-                        child: LineChart(
-                          LineChartData(
-                            lineTouchData: LineTouchData(
-                              touchTooltipData: LineTouchTooltipData(
-                                getTooltipColor: (LineBarSpot spot) => Colors.white.withOpacity(0.8),
-                                tooltipBorderRadius: BorderRadius.circular(8),
-                                tooltipBorder: BorderSide(color: Colors.grey, width: 1),
-                                tooltipPadding: const EdgeInsets.all(8),
-                                tooltipMargin: 10,
+                        child: BarChart(
+                          BarChartData(
+                            alignment: BarChartAlignment.spaceAround,
+                            maxY: 14, // Max value for pH
+                            barTouchData: BarTouchData(
+                              touchTooltipData: BarTouchTooltipData(
+                                tooltipRoundedRadius: 8,
+                                getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                                  String parameter = groupIndex == 0 ? 'pH' : 'TDS';
+                                  double value = rod.toY;
+                                  String unit = groupIndex == 0 ? '' : ' mg/L';
+                                  return BarTooltipItem(
+                                    '$parameter: ${value.toStringAsFixed(1)}$unit',
+                                    const TextStyle(
+                                      color: Colors.black87,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  );
+                                },
                               ),
+                            ),
+                            titlesData: FlTitlesData(
+                              show: true,
+                              bottomTitles: AxisTitles(
+                                sideTitles: SideTitles(
+                                  showTitles: true,
+                                  getTitlesWidget: (value, meta) {
+                                    return Text(
+                                      value == 0 ? 'pH' : 'TDS',
+                                      style: const TextStyle(
+                                        color: Colors.grey,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                              leftTitles: AxisTitles(
+                                sideTitles: SideTitles(
+                                  showTitles: true,
+                                  reservedSize: 30,
+                                  getTitlesWidget: (value, meta) {
+                                    return Text(
+                                      value.toInt().toString(),
+                                      style: const TextStyle(
+                                        color: Colors.grey,
+                                        fontSize: 10,
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                              topTitles: AxisTitles(
+                                sideTitles: SideTitles(showTitles: false),
+                              ),
+                              rightTitles: AxisTitles(
+                                sideTitles: SideTitles(showTitles: false),
+                              ),
+                            ),
+                            borderData: FlBorderData(
+                              show: false,
                             ),
                             gridData: FlGridData(
                               show: true,
@@ -315,72 +367,36 @@ class _HomePageState extends State<HomePage> {
                                 );
                               },
                             ),
-                            titlesData: FlTitlesData(
-                              bottomTitles: AxisTitles(
-                                sideTitles: SideTitles(
-                                  showTitles: true,
-                                  getTitlesWidget: (value, meta) {
-                                    if (value >= 0 && value < _dateLabels.length) {
-                                      return Text(
-                                        _dateLabels[value.toInt()],
-                                        style: const TextStyle(
-                                          fontSize: 10,
-                                          color: Colors.grey,
-                                        ),
-                                      );
-                                    }
-                                    return const Text('');
-                                  },
-                                ),
+                            barGroups: [
+                              // pH Bar
+                              BarChartGroupData(
+                                x: 0,
+                                barRods: [
+                                  BarChartRodData(
+                                    toY: _waterQualityData.last['ph'] ?? 0,
+                                    color: const Color(0xFFEC4899),
+                                    width: 20,
+                                    borderRadius: const BorderRadius.only(
+                                      topLeft: Radius.circular(6),
+                                      topRight: Radius.circular(6),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              leftTitles: AxisTitles(
-                                sideTitles: SideTitles(
-                                  showTitles: true,
-                                  getTitlesWidget: (value, meta) {
-                                    return Text(
-                                      value.toInt().toString(),
-                                      style: const TextStyle(
-                                        fontSize: 10,
-                                        color: Colors.grey,
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                              rightTitles: AxisTitles(
-                                sideTitles: SideTitles(showTitles: false),
-                              ),
-                              topTitles: AxisTitles(
-                                sideTitles: SideTitles(showTitles: false),
-                              ),
-                            ),
-                            borderData: FlBorderData(show: false),
-                            lineBarsData: [
-                              // TDS Line
-                              LineChartBarData(
-                                spots: _getChartData('tds'),
-                                isCurved: true,
-                                color: const Color(0xFF6366F1),
-                                barWidth: 2,
-                                isStrokeCapRound: true,
-                                dotData: FlDotData(show: false),
-                                belowBarData: BarAreaData(
-                                  show: true,
-                                  color: const Color(0xFF6366F1).withOpacity(0.1),
-                                ),
-                              ),
-                              // PH Line
-                              LineChartBarData(
-                                spots: _getChartData('ph'),
-                                isCurved: true,
-                                color: const Color(0xFFEC4899),
-                                barWidth: 2,
-                                isStrokeCapRound: true,
-                                dotData: FlDotData(show: false),
-                                belowBarData: BarAreaData(
-                                  show: true,
-                                  color: const Color(0xFFEC4899).withOpacity(0.1),
-                                ),
+                              // TDS Bar
+                              BarChartGroupData(
+                                x: 1,
+                                barRods: [
+                                  BarChartRodData(
+                                    toY: (_waterQualityData.last['tds'] ?? 0) / 100, // Scale down TDS for better visualization
+                                    color: const Color(0xFF6366F1),
+                                    width: 20,
+                                    borderRadius: const BorderRadius.only(
+                                      topLeft: Radius.circular(6),
+                                      topRight: Radius.circular(6),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
