@@ -16,6 +16,11 @@ service cloud.firestore {
     match /reminders/{reminderId} {
       allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
       allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      // Allow querying by baseReminderId or userId
+      allow list: if request.auth != null && (
+        request.query.filters[0].field == 'userId' && request.auth.uid == request.query.filters[0].value ||
+        request.query.filters[0].field == 'baseReminderId'
+      );
     }
 
     // Allow read access to filters collection for authenticated users

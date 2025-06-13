@@ -35,7 +35,7 @@ class AnalysisPage extends StatelessWidget {
             const SizedBox(height: 16),
             _buildAnalysisOption(
               context,
-              title: 'Filter Replacement Prediction',
+              title: 'Filter Health Prediction',
               icon: Icons.access_time,
               description: 'Predict when to replace your water filter',
               route: '/filter_prediction',

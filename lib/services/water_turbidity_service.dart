@@ -5,6 +5,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as path;
 import '../class/water_turbidity_model.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 class WaterTurbidityService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -289,5 +290,65 @@ class WaterTurbidityService {
       print('Error fetching turbidity data: $e');
       rethrow;
     }
+  }
+
+  // Get turbidity data for a specific time range
+  Future<List<Map<String, dynamic>>> getTurbidityData(String timeRange) async {
+    try {
+      final String? userId = _auth.currentUser?.uid;
+      if (userId == null) {
+        throw Exception('User not logged in');
+      }
+
+      // Calculate the start date based on the selected time range
+      DateTime startDate;
+      final now = DateTime.now();
+      
+      switch (timeRange) {
+        case 'Last 7 days':
+          startDate = now.subtract(const Duration(days: 7));
+          break;
+        case 'Last 30 days':
+          startDate = now.subtract(const Duration(days: 30));
+          break;
+        case 'Last 90 days':
+          startDate = now.subtract(const Duration(days: 90));
+          break;
+        default:
+          startDate = now.subtract(const Duration(days: 7));
+      }
+
+      // Query the turbidity analysis results
+      final QuerySnapshot snapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('turbidity_analysis')
+          .where('timestamp', isGreaterThanOrEqualTo: startDate)
+          .orderBy('timestamp', descending: false)
+          .get();
+
+      // Convert the documents to a list of maps
+      return snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        return {
+          'timestamp': data['timestamp'],
+          'estimated_ntu': data['estimated_ntu'] ?? 0.0,
+          'water_quality_status': data['water_quality_status'] ?? 'Unknown',
+          'confidence_display': data['confidence_display'] ?? 'Unknown',
+        };
+      }).toList();
+    } catch (e) {
+      print('Error fetching turbidity data: $e');
+      rethrow;
+    }
+  }
+
+  // Convert turbidity data to chart data points
+  List<FlSpot> convertToChartData(List<Map<String, dynamic>> data) {
+    return data.asMap().entries.map((entry) {
+      final index = entry.key.toDouble();
+      final value = entry.value['estimated_ntu'] as double? ?? 0.0;
+      return FlSpot(index, value);
+    }).toList();
   }
 }

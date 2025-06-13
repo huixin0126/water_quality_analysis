@@ -142,50 +142,184 @@ class _FilterPredictionHistoryPageState extends State<FilterPredictionHistoryPag
                       itemCount: _predictions.length,
                       itemBuilder: (context, index) {
                         final prediction = _predictions[index];
+                        final healthPercentage = prediction['healthPercentage'] ?? 0.0;
+                        final healthColor = healthPercentage > 70 
+                            ? Colors.green 
+                            : healthPercentage > 30 
+                                ? Colors.orange 
+                                : Colors.red;
+                        
                         return Card(
                           margin: const EdgeInsets.only(bottom: 16),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      'Prediction Date: ${_predictionService.formatDate(prediction['timestamp'])}',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: InkWell(
+                            onTap: () {
+                              Navigator.pushNamed(
+                                context,
+                                '/filter_prediction_result',
+                                arguments: prediction,
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(16),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        _predictionService.formatDate(prediction['timestamp']),
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                        ),
                                       ),
+                                      IconButton(
+                                        icon: const Icon(Icons.delete, color: Colors.red),
+                                        onPressed: () => _showDeleteConfirmation(prediction['id']),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 16),
+                                  // Health Status
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Text(
+                                            'Filter Health',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.grey,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            '${healthPercentage.toStringAsFixed(1)}%',
+                                            style: TextStyle(
+                                              fontSize: 24,
+                                              fontWeight: FontWeight.bold,
+                                              color: healthColor,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      SizedBox(
+                                        width: 60,
+                                        height: 60,
+                                        child: CircularProgressIndicator(
+                                          value: healthPercentage / 100,
+                                          strokeWidth: 8,
+                                          backgroundColor: Colors.grey.shade300,
+                                          valueColor: AlwaysStoppedAnimation<Color>(healthColor),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 16),
+                                  // Key Metrics
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      _buildMetricColumn(
+                                        'Installation',
+                                        _predictionService.formatDate(prediction['installationDate']),
+                                      ),
+                                      _buildMetricColumn(
+                                        'Replacement',
+                                        _predictionService.formatDate(prediction['replacementDate']),
+                                      ),
+                                      _buildMetricColumn(
+                                        'Days Left',
+                                        '${prediction['daysUntilReplacement'] ?? 0}',
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 16),
+                                  // Water Parameters
+                                  const Text(
+                                    'Water Parameters',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.grey,
                                     ),
-                                    IconButton(
-                                      icon: const Icon(Icons.delete, color: Colors.red),
-                                      onPressed: () => _showDeleteConfirmation(prediction['id']),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                Text('Health: ${prediction['healthPercentage'] ?? 0.0}%'),
-                                Text('Installation Date: ${_predictionService.formatDate(prediction['installationDate'])}'),
-                                Text('Replacement Date: ${_predictionService.formatDate(prediction['replacementDate'])}'),
-                                Text('Days Until Replacement: ${prediction['daysUntilReplacement'] ?? 0}'),
-                                Text('Current Efficiency: ${prediction['currentEfficiency'] ?? 0.0}%'),
-                                Text('Initial Efficiency: ${prediction['initialEfficiency'] ?? 0.0}%'),
-                                const SizedBox(height: 8),
-                                const Text(
-                                  'Water Parameters:',
-                                  style: TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                                Text('TDS: ${prediction['tds'] ?? 0.0}'),
-                                Text('pH: ${prediction['ph'] ?? 0.0}'),
-                                Text('Turbidity: ${prediction['turbidity'] ?? 0.0}'),
-                              ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      _buildParameterChip('TDS', '${prediction['tds'] ?? 0.0}'),
+                                      _buildParameterChip('pH', '${prediction['ph'] ?? 0.0}'),
+                                      _buildParameterChip('Turbidity', '${prediction['turbidity'] ?? 0.0}'),
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         );
                       },
                     ),
+    );
+  }
+
+  Widget _buildMetricColumn(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            color: Colors.grey,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildParameterChip(String label, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              color: Colors.grey,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
     );
   }
 } 

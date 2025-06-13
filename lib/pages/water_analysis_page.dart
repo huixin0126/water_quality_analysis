@@ -21,6 +21,7 @@ class _WaterAnalysisPageState extends State<WaterAnalysisPage> with SingleTicker
   final TextEditingController _conductivityController = TextEditingController();
   final TextEditingController _organicCarbonController = TextEditingController();
   final TextEditingController _trihalomethanesController = TextEditingController();
+  final TextEditingController _turbidityController = TextEditingController();
   bool _isAnalyzing = false;
   final WaterPotabilityService _potabilityService = WaterPotabilityService();
   final WaterAnalysisFirestoreService _firestoreService = WaterAnalysisFirestoreService();
@@ -42,6 +43,7 @@ class _WaterAnalysisPageState extends State<WaterAnalysisPage> with SingleTicker
     _conductivityController.dispose();
     _organicCarbonController.dispose();
     _trihalomethanesController.dispose();
+    _turbidityController.dispose();
     _tabController.dispose();
     super.dispose();
   }
@@ -130,15 +132,15 @@ class _WaterAnalysisPageState extends State<WaterAnalysisPage> with SingleTicker
   void _analyzeWater9Features() async {
     // Validate all inputs
     final controllers = {
-      'pH': _phController,
-      'TDS': _tdsController,
+      'pH Level': _phController,
       'Hardness': _hardnessController,
-      'Solids': _solidsController,
+      'Solids (TDS)': _solidsController,
       'Chloramines': _chloraminesController,
       'Sulfate': _sulfateController,
       'Conductivity': _conductivityController,
       'Organic Carbon': _organicCarbonController,
       'Trihalomethanes': _trihalomethanesController,
+      'Turbidity': _turbidityController,
     };
 
     for (var entry in controllers.entries) {
@@ -157,7 +159,6 @@ class _WaterAnalysisPageState extends State<WaterAnalysisPage> with SingleTicker
       // Parse all values
       final Map<String, double> params = {
         'ph': double.parse(_phController.text),
-        'tds': double.parse(_tdsController.text),
         'hardness': double.parse(_hardnessController.text),
         'solids': double.parse(_solidsController.text),
         'chloramines': double.parse(_chloraminesController.text),
@@ -165,6 +166,7 @@ class _WaterAnalysisPageState extends State<WaterAnalysisPage> with SingleTicker
         'conductivity': double.parse(_conductivityController.text),
         'organic_carbon': double.parse(_organicCarbonController.text),
         'trihalomethanes': double.parse(_trihalomethanesController.text),
+        'turbidity': double.parse(_turbidityController.text),
       };
 
       // Validate pH range
@@ -202,7 +204,7 @@ class _WaterAnalysisPageState extends State<WaterAnalysisPage> with SingleTicker
       // Save result to Firestore
       String analysisId = await _firestoreService.saveWaterAnalysisResult(
         ph: params['ph']!,
-        tds: params['tds']!,
+        tds: params['solids']!, // Use solids value as TDS
         potableProbability: result['potable_probability'],
         isPotable: result['is_potable'],
         analysisType: '9features',
@@ -361,16 +363,13 @@ class _WaterAnalysisPageState extends State<WaterAnalysisPage> with SingleTicker
           const SizedBox(height: 24),
           
           // pH value field
-          _buildParameterField('pH', _phController),
-          
-          // TDS value field
-          _buildParameterField('TDS', _tdsController, suffix: 'mg/L'),
+          _buildParameterField('pH Level', _phController),
           
           // Hardness value field
           _buildParameterField('Hardness', _hardnessController, suffix: 'mg/L'),
           
-          // Solids value field
-          _buildParameterField('Solids', _solidsController, suffix: 'mg/L'),
+          // Solids (TDS) value field
+          _buildParameterField('Solids (TDS)', _solidsController, suffix: 'mg/L'),
           
           // Chloramines value field
           _buildParameterField('Chloramines', _chloraminesController, suffix: 'mg/L'),
@@ -386,6 +385,9 @@ class _WaterAnalysisPageState extends State<WaterAnalysisPage> with SingleTicker
           
           // Trihalomethanes value field
           _buildParameterField('Trihalomethanes', _trihalomethanesController, suffix: 'µg/L'),
+          
+          // Turbidity value field
+          _buildParameterField('Turbidity', _turbidityController, suffix: 'NTU'),
           
           const SizedBox(height: 24),
           

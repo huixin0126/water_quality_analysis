@@ -25,8 +25,6 @@ class _AddReminderPageState extends State<AddReminderPage> {
   DateTime _selectedDate = DateTime.now();
   TimeOfDay _selectedTime = TimeOfDay.now();
   String _selectedType = 'Water Intake';
-  bool _isRepeating = false;
-  List<int> _selectedDays = [];
   
   final List<String> _reminderTypes = [
     'Water Intake',
@@ -43,8 +41,6 @@ class _AddReminderPageState extends State<AddReminderPage> {
       _selectedDate = widget.reminder!.dateTime;
       _selectedTime = TimeOfDay.fromDateTime(widget.reminder!.dateTime);
       _selectedType = widget.reminder!.type;
-      _isRepeating = widget.reminder!.isRepeating;
-      _selectedDays = List.from(widget.reminder!.repeatDays);
     }
   }
 
@@ -81,28 +77,12 @@ class _AddReminderPageState extends State<AddReminderPage> {
     }
   }
 
-  void _toggleDay(int day) {
-    setState(() {
-      if (_selectedDays.contains(day)) {
-        _selectedDays.remove(day);
-      } else {
-        _selectedDays.add(day);
-      }
-      _selectedDays.sort();
-    });
-  }
-
   Future<void> _saveReminder() async {
     if (!_formKey.currentState!.validate()) return;
 
     try {
       final user = _auth.currentUser;
-      if (user == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please sign in to save reminders')),
-        );
-        return;
-      }
+      if (user == null) throw Exception('User not authenticated');
 
       final DateTime dateTime = DateTime(
         _selectedDate.year,
@@ -116,7 +96,7 @@ class _AddReminderPageState extends State<AddReminderPage> {
         id: widget.reminder?.id,
         title: _titleController.text,
         dateTime: dateTime,
-        repeatDays: _isRepeating ? _selectedDays : [],
+        repeatDays: [],
         notes: _notesController.text,
         type: _selectedType,
         userId: user.uid,
@@ -169,109 +149,93 @@ class _AddReminderPageState extends State<AddReminderPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.reminder == null ? 'Add Reminder' : 'Edit Reminder'),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
       ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            TextFormField(
-              controller: _titleController,
-              decoration: const InputDecoration(
-                labelText: 'Title',
-                hintText: 'Enter reminder title',
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter a title';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              value: _selectedType,
-              decoration: const InputDecoration(
-                labelText: 'Type',
-              ),
-              items: _reminderTypes.map((type) {
-                return DropdownMenuItem(
-                  value: type,
-                  child: Text(type),
-                );
-              }).toList(),
-              onChanged: (value) {
-                if (value != null) {
-                  setState(() {
-                    _selectedType = value;
-                  });
-                }
-              },
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _selectDate(context),
-                    icon: const Icon(Icons.calendar_today),
-                    label: Text(
-                      DateFormat('MMM dd, yyyy').format(_selectedDate),
-                    ),
-                  ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextFormField(
+                controller: _titleController,
+                decoration: const InputDecoration(
+                  labelText: 'Title',
+                  border: OutlineInputBorder(),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _selectTime(context),
-                    icon: const Icon(Icons.access_time),
-                    label: Text(_selectedTime.format(context)),
-                  ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter a title';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: _selectedType,
+                decoration: const InputDecoration(
+                  labelText: 'Type',
+                  border: OutlineInputBorder(),
                 ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            SwitchListTile(
-              title: const Text('Repeat'),
-              value: _isRepeating,
-              onChanged: (value) {
-                setState(() {
-                  _isRepeating = value;
-                  if (!value) _selectedDays.clear();
-                });
-              },
-            ),
-            if (_isRepeating) ...[
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
+                items: _reminderTypes.map((String type) {
+                  return DropdownMenuItem<String>(
+                    value: type,
+                    child: Text(type),
+                  );
+                }).toList(),
+                onChanged: (String? newValue) {
+                  if (newValue != null) {
+                    setState(() {
+                      _selectedType = newValue;
+                    });
+                  }
+                },
+              ),
+              const SizedBox(height: 16),
+              Row(
                 children: [
-                  for (int i = 1; i <= 7; i++)
-                    FilterChip(
-                      label: Text(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i - 1]),
-                      selected: _selectedDays.contains(i),
-                      onSelected: (selected) => _toggleDay(i),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _selectDate(context),
+                      icon: const Icon(Icons.calendar_today),
+                      label: Text(DateFormat('MMM dd, yyyy').format(_selectedDate)),
                     ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _selectTime(context),
+                      icon: const Icon(Icons.access_time),
+                      label: Text(_selectedTime.format(context)),
+                    ),
+                  ),
                 ],
               ),
-            ],
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _notesController,
-              decoration: const InputDecoration(
-                labelText: 'Notes',
-                hintText: 'Enter any additional notes',
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _notesController,
+                decoration: const InputDecoration(
+                  labelText: 'Notes (Optional)',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
               ),
-              maxLines: 3,
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: _saveReminder,
-              child: Text(widget.reminder == null ? 'Add Reminder' : 'Update Reminder'),
-            ),
-          ],
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _saveReminder,
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  child: Text(
+                    widget.reminder == null ? 'Add Reminder' : 'Update Reminder',
+                    style: const TextStyle(fontSize: 16),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

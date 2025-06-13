@@ -27,16 +27,14 @@ class _HomePageState extends State<HomePage> {
   final FilterPredictionService _filterPredictionService = FilterPredictionService();
   List<Map<String, dynamic>> _waterQualityData = [];
   List<String> _dateLabels = [];
-  Map<String, dynamic>? _latestTurbidityData;
-  Map<String, dynamic>? _latestFilterPrediction;
+  List<Map<String, dynamic>> _turbidityData = [];
+  List<Map<String, dynamic>> _filterPredictionData = [];
 
   @override
   void initState() {
     super.initState();
     _loadProfileImage();
     _loadWaterQualityData();
-    _loadLatestTurbidityData();
-    _loadLatestFilterPrediction();
   }
 
   // Load profile image from Firestore
@@ -86,79 +84,55 @@ class _HomePageState extends State<HomePage> {
 
     try {
       final data = await _waterQualityService.getWaterQualityData(_selectedTimeRange);
+      final turbidityData = await _turbidityService.getTurbidityData(_selectedTimeRange);
+      final filterData = await _filterPredictionService.getPredictionData(_selectedTimeRange);
+      
+      // Process water quality data to get analysis percentage
+      final processedWaterQualityData = data.map((item) {
+        final potableProbability = item['potable_probability'] as double? ?? 0.0;
+        return {
+          ...item,
+          'analysis_percentage': potableProbability.round(),
+        };
+      }).toList();
+
+      // Process turbidity data to get percentage from confidence display
+      final processedTurbidityData = turbidityData.map((item) {
+        final confidenceDisplay = item['confidence_display'] as String? ?? '0%';
+        // Keep the entire confidence display string
+        return {
+          ...item,
+          'turbidity_percentage': confidenceDisplay,
+        };
+      }).toList();
+      
       setState(() {
-        _waterQualityData = data;
+        _waterQualityData = processedWaterQualityData;
+        _turbidityData = processedTurbidityData;
+        _filterPredictionData = filterData;
         _dateLabels = _waterQualityService.getDateLabels(data);
         _isLoadingData = false;
       });
     } catch (e) {
       setState(() {
-        _errorMessage = 'Failed to load water quality data: ${e.toString()}';
+        _errorMessage = 'Failed to load data: ${e.toString()}';
         _isLoadingData = false;
       });
     }
   }
 
-  // Load latest turbidity data
-  Future<void> _loadLatestTurbidityData() async {
-    try {
-      final data = await _turbidityService.getLatestTurbidityData();
-      setState(() {
-        _latestTurbidityData = data;
-      });
-    } catch (e) {
-      print('Error loading turbidity data: $e');
-    }
-  }
-
-  Future<void> _loadLatestFilterPrediction() async {
-    try {
-      final prediction = await _filterPredictionService.getLatestPrediction();
-      setState(() {
-        _latestFilterPrediction = prediction;
-      });
-    } catch (e) {
-      print('Error loading filter prediction: $e');
-    }
-  }
-
   // Get chart data for a specific parameter
   List<FlSpot> _getChartData(String parameter) {
-    return _waterQualityService.convertToChartData(_waterQualityData, parameter);
-  }
-
-  // Calculate overall water quality score
-  double _calculateWaterQualityScore() {
-    if (_waterQualityData.isEmpty) return 0.0;
-    
-    final latestData = _waterQualityData.last;
-    double ph = latestData['ph'] ?? 7.0;
-    double tds = latestData['tds'] ?? 0.0;
-    
-    // pH score (optimal range: 6.5-8.5)
-    double phScore = 0.0;
-    if (ph >= 6.5 && ph <= 8.5) {
-      phScore = 100.0;
-    } else if (ph >= 6.0 && ph <= 9.0) {
-      phScore = 70.0;
-    } else {
-      phScore = 30.0;
+    switch (parameter) {
+      case 'analysis':
+        return _waterQualityService.convertToChartData(_waterQualityData, 'analysis_percentage');
+      case 'turbidity':
+        return _turbidityService.convertToChartData(_turbidityData);
+      case 'filter':
+        return _filterPredictionService.convertToChartData(_filterPredictionData);
+      default:
+        return [];
     }
-    
-    // TDS score (lower is better)
-    double tdsScore = 0.0;
-    if (tds < 300) {
-      tdsScore = 100.0;
-    } else if (tds < 600) {
-      tdsScore = 70.0;
-    } else if (tds < 900) {
-      tdsScore = 40.0;
-    } else {
-      tdsScore = 20.0;
-    }
-    
-    // Calculate weighted average
-    return (phScore * 0.4 + tdsScore * 0.6);
   }
 
   @override
@@ -258,7 +232,7 @@ class _HomePageState extends State<HomePage> {
                     
                     // Chart Legend
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
                         Row(
                           children: [
@@ -271,10 +245,9 @@ class _HomePageState extends State<HomePage> {
                               ),
                             ),
                             const SizedBox(width: 4),
-                            const Text('TDS', style: TextStyle(fontSize: 12)),
+                            const Text('Analysis %', style: TextStyle(fontSize: 12)),
                           ],
                         ),
-                        const SizedBox(width: 16),
                         Row(
                           children: [
                             Container(
@@ -286,7 +259,21 @@ class _HomePageState extends State<HomePage> {
                               ),
                             ),
                             const SizedBox(width: 4),
-                            const Text('PH', style: TextStyle(fontSize: 12)),
+                            const Text('Turbidity %', style: TextStyle(fontSize: 12)),
+                          ],
+                        ),
+                        Row(
+                          children: [
+                            Container(
+                              width: 12,
+                              height: 12,
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Color(0xFF10B981),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            const Text('Filter %', style: TextStyle(fontSize: 12)),
                           ],
                         ),
                       ],
@@ -341,7 +328,7 @@ class _HomePageState extends State<HomePage> {
                                     const Icon(Icons.swap_horiz, size: 16),
                                     const SizedBox(width: 8),
                                     const Text(
-                                      'Swipe to switch between TDS and pH',
+                                      'Swipe to switch between graphs',
                                       style: TextStyle(
                                         fontSize: 12,
                                         color: Colors.grey,
@@ -359,11 +346,11 @@ class _HomePageState extends State<HomePage> {
                             height: 280,
                             child: PageView(
                               children: [
-                                // TDS Chart
+                                // Analysis Percentage Chart
                                 Column(
                                   children: [
                                     const Text(
-                                      'TDS (ppm)',
+                                      'Water Analysis Percentage',
                                       style: TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.bold,
@@ -386,7 +373,7 @@ class _HomePageState extends State<HomePage> {
                                                   final date = _dateLabels[spot.x.toInt()];
                                                   final value = spot.y.toStringAsFixed(1);
                                                   return LineTooltipItem(
-                                                    'TDS: $value ppm\n$date',
+                                                    'Analysis: $value%\n$date',
                                                     const TextStyle(
                                                       color: Colors.black87,
                                                       fontSize: 12,
@@ -399,7 +386,7 @@ class _HomePageState extends State<HomePage> {
                                           gridData: FlGridData(
                                             show: true,
                                             drawVerticalLine: false,
-                                            horizontalInterval: 200,
+                                            horizontalInterval: 20,
                                             getDrawingHorizontalLine: (value) {
                                               return FlLine(
                                                 color: Colors.grey.withOpacity(0.2),
@@ -436,14 +423,14 @@ class _HomePageState extends State<HomePage> {
                                                 reservedSize: 40,
                                                 getTitlesWidget: (value, meta) {
                                                   return Text(
-                                                    '${value.toInt()}',
+                                                    '${value.toInt()}%',
                                                     style: const TextStyle(
                                                       fontSize: 10,
                                                       color: Color(0xFF6366F1),
                                                     ),
                                                   );
                                                 },
-                                                interval: 200,
+                                                interval: 20,
                                               ),
                                             ),
                                             rightTitles: AxisTitles(
@@ -457,10 +444,10 @@ class _HomePageState extends State<HomePage> {
                                           minX: 0,
                                           maxX: (_dateLabels.length - 1).toDouble(),
                                           minY: 0,
-                                          maxY: 1000,
+                                          maxY: 100,
                                           lineBarsData: [
                                             LineChartBarData(
-                                              spots: _getChartData('tds'),
+                                              spots: _getChartData('analysis'),
                                               isCurved: true,
                                               color: const Color(0xFF6366F1),
                                               barWidth: 2,
@@ -488,11 +475,11 @@ class _HomePageState extends State<HomePage> {
                                   ],
                                 ),
                                 
-                                // pH Chart
+                                // Turbidity Chart
                                 Column(
                                   children: [
                                     const Text(
-                                      'pH Level',
+                                      'Turbidity Percentage',
                                       style: TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.bold,
@@ -515,7 +502,7 @@ class _HomePageState extends State<HomePage> {
                                                   final date = _dateLabels[spot.x.toInt()];
                                                   final value = spot.y.toStringAsFixed(1);
                                                   return LineTooltipItem(
-                                                    'pH: $value\n$date',
+                                                    'Turbidity: $value%\n$date',
                                                     const TextStyle(
                                                       color: Colors.black87,
                                                       fontSize: 12,
@@ -528,7 +515,7 @@ class _HomePageState extends State<HomePage> {
                                           gridData: FlGridData(
                                             show: true,
                                             drawVerticalLine: false,
-                                            horizontalInterval: 1,
+                                            horizontalInterval: 20,
                                             getDrawingHorizontalLine: (value) {
                                               return FlLine(
                                                 color: Colors.grey.withOpacity(0.2),
@@ -565,14 +552,14 @@ class _HomePageState extends State<HomePage> {
                                                 reservedSize: 40,
                                                 getTitlesWidget: (value, meta) {
                                                   return Text(
-                                                    value.toStringAsFixed(1),
+                                                    '${value.toInt()}%',
                                                     style: const TextStyle(
                                                       fontSize: 10,
                                                       color: Color(0xFFEC4899),
                                                     ),
                                                   );
                                                 },
-                                                interval: 1,
+                                                interval: 20,
                                               ),
                                             ),
                                             rightTitles: AxisTitles(
@@ -586,10 +573,10 @@ class _HomePageState extends State<HomePage> {
                                           minX: 0,
                                           maxX: (_dateLabels.length - 1).toDouble(),
                                           minY: 0,
-                                          maxY: 14,
+                                          maxY: 100,
                                           lineBarsData: [
                                             LineChartBarData(
-                                              spots: _getChartData('ph'),
+                                              spots: _getChartData('turbidity'),
                                               isCurved: true,
                                               color: const Color(0xFFEC4899),
                                               barWidth: 2,
@@ -608,6 +595,135 @@ class _HomePageState extends State<HomePage> {
                                               belowBarData: BarAreaData(
                                                 show: true,
                                                 color: const Color(0xFFEC4899).withOpacity(0.1),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+
+                                // Filter Health Chart
+                                Column(
+                                  children: [
+                                    const Text(
+                                      'Filter Health Percentage',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF10B981),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Expanded(
+                                      child: LineChart(
+                                        LineChartData(
+                                          lineTouchData: LineTouchData(
+                                            touchTooltipData: LineTouchTooltipData(
+                                              getTooltipColor: (LineBarSpot spot) => Colors.white.withOpacity(0.8),
+                                              tooltipBorderRadius: BorderRadius.circular(8),
+                                              tooltipBorder: BorderSide(color: Colors.grey, width: 1),
+                                              tooltipPadding: const EdgeInsets.all(8),
+                                              tooltipMargin: 10,
+                                              getTooltipItems: (List<LineBarSpot> spots) {
+                                                return spots.map((spot) {
+                                                  final date = _dateLabels[spot.x.toInt()];
+                                                  final value = spot.y.toStringAsFixed(1);
+                                                  return LineTooltipItem(
+                                                    'Filter Health: $value%\n$date',
+                                                    const TextStyle(
+                                                      color: Colors.black87,
+                                                      fontSize: 12,
+                                                    ),
+                                                  );
+                                                }).toList();
+                                              },
+                                            ),
+                                          ),
+                                          gridData: FlGridData(
+                                            show: true,
+                                            drawVerticalLine: false,
+                                            horizontalInterval: 20,
+                                            getDrawingHorizontalLine: (value) {
+                                              return FlLine(
+                                                color: Colors.grey.withOpacity(0.2),
+                                                strokeWidth: 1,
+                                              );
+                                            },
+                                          ),
+                                          titlesData: FlTitlesData(
+                                            bottomTitles: AxisTitles(
+                                              sideTitles: SideTitles(
+                                                showTitles: true,
+                                                reservedSize: 30,
+                                                getTitlesWidget: (value, meta) {
+                                                  if (value >= 0 && value < _dateLabels.length) {
+                                                    return Padding(
+                                                      padding: const EdgeInsets.only(top: 8.0),
+                                                      child: Text(
+                                                        _dateLabels[value.toInt()],
+                                                        style: const TextStyle(
+                                                          fontSize: 10,
+                                                          color: Colors.grey,
+                                                        ),
+                                                      ),
+                                                    );
+                                                  }
+                                                  return const Text('');
+                                                },
+                                                interval: (_dateLabels.length / 5).ceil().toDouble(),
+                                              ),
+                                            ),
+                                            leftTitles: AxisTitles(
+                                              sideTitles: SideTitles(
+                                                showTitles: true,
+                                                reservedSize: 40,
+                                                getTitlesWidget: (value, meta) {
+                                                  return Text(
+                                                    '${value.toInt()}%',
+                                                    style: const TextStyle(
+                                                      fontSize: 10,
+                                                      color: Color(0xFF10B981),
+                                                    ),
+                                                  );
+                                                },
+                                                interval: 20,
+                                              ),
+                                            ),
+                                            rightTitles: AxisTitles(
+                                              sideTitles: SideTitles(showTitles: false),
+                                            ),
+                                            topTitles: AxisTitles(
+                                              sideTitles: SideTitles(showTitles: false),
+                                            ),
+                                          ),
+                                          borderData: FlBorderData(show: false),
+                                          minX: 0,
+                                          maxX: (_dateLabels.length - 1).toDouble(),
+                                          minY: 0,
+                                          maxY: 100,
+                                          lineBarsData: [
+                                            LineChartBarData(
+                                              spots: _getChartData('filter'),
+                                              isCurved: true,
+                                              color: const Color(0xFF10B981),
+                                              barWidth: 2,
+                                              isStrokeCapRound: true,
+                                              dotData: FlDotData(
+                                                show: true,
+                                                getDotPainter: (spot, percent, barData, index) {
+                                                  return FlDotCirclePainter(
+                                                    radius: 4,
+                                                    color: const Color(0xFF10B981),
+                                                    strokeWidth: 1,
+                                                    strokeColor: Colors.white,
+                                                  );
+                                                },
+                                              ),
+                                              belowBarData: BarAreaData(
+                                                show: true,
+                                                color: const Color(0xFF10B981).withOpacity(0.1),
                                               ),
                                             ),
                                           ],
@@ -662,13 +778,14 @@ class _HomePageState extends State<HomePage> {
                 else
                   Column(
                     children: [
-                      // PH Card
+                      // Water Quality Analysis Card
+                      if (_waterQualityData.isNotEmpty) ...[
                       Card(
                         elevation: 0,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        color: const Color(0xFFFEF2F2),
+                          color: const Color(0xFFEEF2FF),
                         child: Padding(
                           padding: const EdgeInsets.all(12),
                           child: Row(
@@ -677,12 +794,12 @@ class _HomePageState extends State<HomePage> {
                                 width: 40,
                                 height: 40,
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFEC4899).withOpacity(0.1),
+                                    color: const Color(0xFF6366F1).withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: const Icon(
                                   Icons.water_drop,
-                                  color: Color(0xFFEC4899),
+                                    color: Color(0xFF6366F1),
                                   size: 20,
                                 ),
                               ),
@@ -692,16 +809,16 @@ class _HomePageState extends State<HomePage> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     const Text(
-                                      'PH',
+                                        'Water Quality',
                                       style: TextStyle(
                                         fontSize: 13,
-                                        color: Color(0xFFEC4899),
+                                          color: Color(0xFF6366F1),
                                         fontWeight: FontWeight.w500,
                                       ),
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
-                                      _waterQualityData.last['ph'].toString(),
+                                        '${_waterQualityData.last['analysis_percentage']}%',
                                       style: const TextStyle(
                                         fontSize: 18,
                                         fontWeight: FontWeight.bold,
@@ -715,14 +832,16 @@ class _HomePageState extends State<HomePage> {
                         ),
                       ),
                       const SizedBox(height: 8),
+                      ],
                       
-                      // TDS Card
+                      // Turbidity Card
+                      if (_turbidityData.isNotEmpty) ...[
                       Card(
                         elevation: 0,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        color: const Color(0xFFF0F0FF),
+                          color: const Color(0xFFFDF2F8),
                         child: Padding(
                           padding: const EdgeInsets.all(12),
                           child: Row(
@@ -731,12 +850,12 @@ class _HomePageState extends State<HomePage> {
                                 width: 40,
                                 height: 40,
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF6366F1).withOpacity(0.1),
+                                    color: const Color(0xFFEC4899).withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: const Icon(
-                                  Icons.water,
-                                  color: Color(0xFF6366F1),
+                                    Icons.camera_alt,
+                                    color: Color(0xFFEC4899),
                                   size: 20,
                                 ),
                               ),
@@ -746,16 +865,16 @@ class _HomePageState extends State<HomePage> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     const Text(
-                                      'TDS',
+                                        'Turbidity',
                                       style: TextStyle(
                                         fontSize: 13,
-                                        color: Color(0xFF6366F1),
+                                          color: Color(0xFFEC4899),
                                         fontWeight: FontWeight.w500,
                                       ),
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
-                                      '${_waterQualityData.last['tds']} ppm',
+                                        '${_turbidityData.last['turbidity_percentage']}',
                                       style: const TextStyle(
                                         fontSize: 18,
                                         fontWeight: FontWeight.bold,
@@ -769,65 +888,10 @@ class _HomePageState extends State<HomePage> {
                         ),
                       ),
                       const SizedBox(height: 8),
+                      ],
                       
-                      // Turbidity Card
-                      if (_latestTurbidityData != null)
-                        Card(
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          color: const Color(0xFFE0F2FE),
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 40,
-                                  height: 40,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF0EA5E9).withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: const Icon(
-                                    Icons.opacity,
-                                    color: Color(0xFF0EA5E9),
-                                    size: 20,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      const Text(
-                                        'Turbidity',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          color: Color(0xFF0EA5E9),
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        _latestTurbidityData!['confidence_display'],
-                                        style: const TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      if (_latestTurbidityData != null)
-                        const SizedBox(height: 8),
-                      
-                      // Filter Replacement Card
-                      if (_latestFilterPrediction != null)
+                      // Filter Health Card
+                      if (_filterPredictionData.isNotEmpty) ...[
                         Card(
                           elevation: 0,
                           shape: RoundedRectangleBorder(
@@ -857,7 +921,7 @@ class _HomePageState extends State<HomePage> {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       const Text(
-                                        'Filter Replacement',
+                                        'Filter Health',
                                         style: TextStyle(
                                           fontSize: 13,
                                           color: Color(0xFF10B981),
@@ -866,7 +930,7 @@ class _HomePageState extends State<HomePage> {
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
-                                        '${_filterPredictionService.formatDate(_latestFilterPrediction!['replacementDate'])} (${_latestFilterPrediction!['daysUntilReplacement']} days)',
+                                        '${_filterPredictionData.last['healthPercentage']}%',
                                         style: const TextStyle(
                                           fontSize: 18,
                                           fontWeight: FontWeight.bold,
@@ -879,111 +943,82 @@ class _HomePageState extends State<HomePage> {
                             ),
                           ),
                         ),
-                    ],
-                  ),
-              ],
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // Overall Water Quality Card (Moved to bottom)
-            Card(
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              color: Colors.white,
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Overall Water Quality',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    if (_isLoadingData)
-                      const Center(
-                        child: CircularProgressIndicator(),
-                      )
-                    else if (_errorMessage != null)
-                      Center(
-                        child: Text(
-                          _errorMessage!,
-                          style: const TextStyle(color: Colors.red),
-                          textAlign: TextAlign.center,
-                        ),
-                      )
-                    else if (_waterQualityData.isEmpty)
-                      const Center(
-                        child: Text(
-                          'No water quality data available',
-                          textAlign: TextAlign.center,
-                        ),
-                      )
-                    else
-                      Center(
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            SizedBox(
-                              width: 180,
-                              height: 180,
-                              child: CircularProgressIndicator(
-                                value: _calculateWaterQualityScore() / 100,
-                                strokeWidth: 20,
-                                backgroundColor: Colors.grey[200],
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  _calculateWaterQualityScore() >= 70
-                                      ? const Color(0xFF10B981)
-                                      : _calculateWaterQualityScore() >= 40
-                                          ? const Color(0xFFF59E0B)
-                                          : const Color(0xFFEF4444),
-                                ),
-                              ),
-                            ),
-                            Column(
-                              mainAxisSize: MainAxisSize.min,
+                        const SizedBox(height: 8),
+                      
+                      // Filter Replacement Card
+                        Card(
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          color: const Color(0xFFDCFCE7),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Row(
                               children: [
-                                Text(
-                                  '${_calculateWaterQualityScore().toStringAsFixed(1)}%',
-                                  style: TextStyle(
-                                    fontSize: 32,
-                                    fontWeight: FontWeight.bold,
-                                    color: _calculateWaterQualityScore() >= 70
-                                        ? const Color(0xFF10B981)
-                                        : _calculateWaterQualityScore() >= 40
-                                            ? const Color(0xFFF59E0B)
-                                            : const Color(0xFFEF4444),
+                                Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF10B981).withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Icon(
+                                    Icons.calendar_today,
+                                    color: Color(0xFF10B981),
+                                    size: 20,
                                   ),
                                 ),
-                                Text(
-                                  _calculateWaterQualityScore() >= 70
-                                      ? 'Good'
-                                      : _calculateWaterQualityScore() >= 40
-                                          ? 'Fair'
-                                          : 'Poor',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: _calculateWaterQualityScore() >= 70
-                                        ? const Color(0xFF10B981)
-                                        : _calculateWaterQualityScore() >= 40
-                                            ? const Color(0xFFF59E0B)
-                                            : const Color(0xFFEF4444),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Filter Replacement',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: Color(0xFF10B981),
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        '${_filterPredictionData.last['daysUntilReplacement']} days left',
+                                        style: const TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ] else
+                        const Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(12)),
+              ),
+                          color: Color(0xFFDCFCE7),
+              child: Padding(
+                            padding: EdgeInsets.all(16),
+                            child: Text(
+                              'No filter prediction data available',
+                      style: TextStyle(
+                                fontSize: 14,
+                                color: Color(0xFF10B981),
+                              ),
+                          textAlign: TextAlign.center,
+                        ),
                                   ),
                                 ),
                               ],
                             ),
                           ],
-                        ),
-                      ),
-                  ],
-                ),
-              ),
             ),
           ],
         ),

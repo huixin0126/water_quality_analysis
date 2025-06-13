@@ -129,17 +129,6 @@ class NotificationService {
     debugPrint('Current time: ${now.toString()}');
     debugPrint('Scheduled time: ${scheduledDate.toString()}');
     debugPrint('Repeat days: ${reminder.repeatDays}');
-    
-    // If the date is in the past, move it to the next occurrence
-    if (scheduledDate.isBefore(now)) {
-      if (reminder.isRepeating) {
-        scheduledDate = _findNextOccurrence(reminder, now);
-        debugPrint('Adjusted to next occurrence: ${scheduledDate.toString()}');
-      } else {
-        debugPrint('Reminder is in the past and not repeating, skipping');
-        return;
-      }
-    }
 
     // Create notification details with maximum priority
     final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
@@ -171,15 +160,6 @@ class NotificationService {
     );
 
     try {
-      // Calculate the exact time difference
-      final scheduledTZ = tz.TZDateTime.from(scheduledDate, tz.local);
-      final nowTZ = tz.TZDateTime.now(tz.local);
-      final difference = scheduledTZ.difference(nowTZ);
-      
-      debugPrint('Time until notification: ${difference.inMinutes} minutes and ${difference.inSeconds % 60} seconds');
-      debugPrint('Scheduled TZDateTime: $scheduledTZ');
-      debugPrint('Current TZDateTime: $nowTZ');
-
       // Cancel any existing notifications for this reminder
       if (reminder.id != null) {
         try {
@@ -193,46 +173,78 @@ class NotificationService {
 
       // For repeating reminders, schedule each day separately
       if (reminder.isRepeating && reminder.repeatDays.isNotEmpty) {
+        // Calculate the end date (7 days from now)
+        final endDate = now.add(const Duration(days: 7));
+        bool hasScheduledAny = false;
+        
         for (int day in reminder.repeatDays) {
-          // Create a unique ID for each day's notification
-          final dayId = reminder.id.hashCode + day;
-          
-          // Calculate the next occurrence for this specific day
-          final nextOccurrence = _getNextDayOccurrence(
-            scheduledDate.hour,
-            scheduledDate.minute,
-            day
+          if (day > 0) { // Skip if day is 0 (no repeat)
+            // Calculate the next occurrence for this specific day
+            DateTime nextOccurrence = _getNextDayOccurrence(
+              scheduledDate.hour,
+              scheduledDate.minute,
+              day
+            );
+            
+            // Only schedule if the next occurrence is within the next 7 days
+            if (nextOccurrence.isBefore(endDate)) {
+              final nextOccurrenceTZ = tz.TZDateTime.from(nextOccurrence, tz.local);
+              
+              debugPrint('Scheduling reminder for day $day at ${nextOccurrenceTZ.toString()}');
+              
+              // Create a unique ID for each day's notification
+              final dayId = reminder.id.hashCode + day;
+              
+              await _notifications.zonedSchedule(
+                dayId,
+                reminder.title,
+                reminder.notes.isNotEmpty ? reminder.notes : 'Time for your ${reminder.type.toLowerCase()} reminder',
+                nextOccurrenceTZ,
+                notificationDetails,
+                androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+                uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+              );
+              hasScheduledAny = true;
+            }
+          }
+        }
+
+        // If no reminders were scheduled (all were in the past), show a message
+        if (!hasScheduledAny) {
+          await _notifications.show(
+            _getUniqueId(),
+            'No Reminders Set',
+            'All selected reminder times are in the past. Please select future times.',
+            notificationDetails,
           );
+          return;
+        }
+      } else {
+        // For non-repeating reminders, schedule only if in the future
+        if (scheduledDate.isAfter(now)) {
+          final reminderId = reminder.id?.hashCode ?? _getUniqueId();
+          debugPrint('Scheduling new reminder with ID: $reminderId');
           
-          final nextOccurrenceTZ = tz.TZDateTime.from(nextOccurrence, tz.local);
-          
-          debugPrint('Scheduling reminder for day $day at ${nextOccurrenceTZ.toString()}');
+          final scheduledTZ = tz.TZDateTime.from(scheduledDate, tz.local);
           
           await _notifications.zonedSchedule(
-            dayId,
+            reminderId,
             reminder.title,
             reminder.notes.isNotEmpty ? reminder.notes : 'Time for your ${reminder.type.toLowerCase()} reminder',
-            nextOccurrenceTZ,
+            scheduledTZ,
             notificationDetails,
             androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
             uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
-            matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
           );
+        } else {
+          await _notifications.show(
+            _getUniqueId(),
+            'Cannot Set Reminder',
+            'The selected time is in the past. Please select a future time.',
+            notificationDetails,
+          );
+          return;
         }
-      } else {
-        // For non-repeating reminders, schedule as normal
-        final reminderId = reminder.id?.hashCode ?? _getUniqueId();
-        debugPrint('Scheduling new reminder with ID: $reminderId');
-        
-        await _notifications.zonedSchedule(
-          reminderId,
-          reminder.title,
-          reminder.notes.isNotEmpty ? reminder.notes : 'Time for your ${reminder.type.toLowerCase()} reminder',
-          scheduledTZ,
-          notificationDetails,
-          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-          uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
-        );
       }
 
       // Show immediate confirmation
@@ -336,12 +348,17 @@ class NotificationService {
       minute
     );
     
-    // If it's earlier today and today matches the target day, use today
-    if (candidate.weekday == targetWeekday && candidate.isAfter(now)) {
-      return candidate;
+    // If today matches the target day
+    if (candidate.weekday == targetWeekday) {
+      // If the time hasn't passed yet today, use today
+      if (candidate.isAfter(now)) {
+        return candidate;
+      }
+      // If the time has passed today, go to next week
+      return candidate.add(const Duration(days: 7));
     }
     
-    // Otherwise, find the next occurrence of the day
+    // If today is not the target day, find the next occurrence
     int daysToAdd = (targetWeekday - now.weekday) % 7;
     if (daysToAdd == 0) {
       // If it's the same day but time has passed, go to next week

@@ -349,12 +349,12 @@ class _WaterAnalysisResultPageState extends State<WaterAnalysisResultPage> {
                     ),
                     const SizedBox(height: 8),
                     
-                    // TDS Value
+                    // Solids (TDS) Value
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text(
-                          'TDS (mg/L):',
+                          'Solids (TDS) (mg/L):',
                           style: TextStyle(
                             fontSize: 16,
                           ),
@@ -379,8 +379,6 @@ class _WaterAnalysisResultPageState extends State<WaterAnalysisResultPage> {
                       const SizedBox(height: 8),
                       _buildParameterRow('Hardness (mg/L)', _analysisData['hardness'] ?? 0.0, 150, 300),
                       const SizedBox(height: 8),
-                      _buildParameterRow('Solids (mg/L)', _analysisData['solids'] ?? 0.0, 0, 500),
-                      const SizedBox(height: 8),
                       _buildParameterRow('Chloramines (mg/L)', _analysisData['chloramines'] ?? 0.0, 2, 4),
                       const SizedBox(height: 8),
                       _buildParameterRow('Sulfate (mg/L)', _analysisData['sulfate'] ?? 0.0, 0, 250),
@@ -390,6 +388,8 @@ class _WaterAnalysisResultPageState extends State<WaterAnalysisResultPage> {
                       _buildParameterRow('Organic Carbon (mg/L)', _analysisData['organic_carbon'] ?? 0.0, 0, 2.5),
                       const SizedBox(height: 8),
                       _buildParameterRow('Trihalomethanes (µg/L)', _analysisData['trihalomethanes'] ?? 0.0, 0, 80),
+                      const SizedBox(height: 8),
+                      _buildParameterRow('Turbidity (NTU)', _analysisData['turbidity'] ?? 0.0, 0, 5),
                     ],
                     
                     const SizedBox(height: 16),

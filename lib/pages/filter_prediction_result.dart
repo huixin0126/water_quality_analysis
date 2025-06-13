@@ -237,10 +237,7 @@ class FilterPredictionResultPage extends StatelessWidget {
                         width: double.infinity,
                         child: ElevatedButton(
                           onPressed: () {
-                            // Navigate to filter shop or schedule replacement
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Shop feature coming soon')),
-                            );
+                            Navigator.pushNamed(context, '/filter_search');
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Theme.of(context).colorScheme.primary,
@@ -261,9 +258,18 @@ class FilterPredictionResultPage extends StatelessWidget {
                         width: double.infinity,
                         child: OutlinedButton(
                           onPressed: () {
-                            // Navigate to schedule maintenance
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Calendar feature coming soon')),
+                            // Navigate to add reminder page with filter replacement details
+                            Navigator.pushNamed(
+                              context,
+                              '/add_reminder',
+                              arguments: {
+                                'title': 'Filter Replacement',
+                                'type': 'Filter Replacement',
+                                'date': replacementDate,
+                                'time': const TimeOfDay(hour: 10, minute: 0),
+                                'repeat': 'none',
+                                'notes': 'Filter replacement due based on analysis. Estimated replacement date: ${dateFormat.format(replacementDate)}',
+                              },
                             );
                           },
                           style: OutlinedButton.styleFrom(

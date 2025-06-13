@@ -12,6 +12,7 @@ import 'pages/home_page.dart';
 import 'pages/profile_page.dart';
 import 'pages/analysis_page.dart';
 import 'pages/filter_prediction_page.dart';
+import 'pages/filter_prediction_result.dart';
 import 'pages/water_analysis_page.dart';
 import 'pages/water_analysis_result_page.dart';
 import 'pages/water_turbidity_page.dart';
@@ -21,6 +22,7 @@ import 'pages/add_reminder_page.dart';
 import 'pages/water_intake_reminder_page.dart';
 import 'pages/water_analysis_history.dart';
 import 'pages/water_turbidity_history.dart';
+import 'pages/filter_prediction_history_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -103,6 +105,9 @@ class _WaterQualityAppState extends State<WaterQualityApp> {
         '/profile': (context) => const ProfilePage(),
         '/analysis': (context) => const AnalysisPage(),
         '/filter_prediction': (context) => const FilterPredictionPage(),
+        '/filter_prediction_result': (context) => FilterPredictionResultPage(
+              predictionData: ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>,
+            ),
         '/water_analysis': (context) => const WaterAnalysisPage(),
         '/water_analysis_result': (context) => const WaterAnalysisResultPage(),
         '/water_turbidity': (context) => const WaterTurbidityPage(),
@@ -112,6 +117,7 @@ class _WaterQualityAppState extends State<WaterQualityApp> {
         '/water_intake_reminder': (context) => const WaterIntakeReminderPage(),
         '/water_analysis_history': (context) => const WaterAnalysisHistoryPage(),
         '/water_turbidity_history': (context) => const WaterTurbidityHistoryPage(),
+        '/filter_prediction_history': (context) => const FilterPredictionHistoryPage(),
       },
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,

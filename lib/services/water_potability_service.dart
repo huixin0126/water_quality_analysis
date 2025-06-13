@@ -85,21 +85,20 @@ class WaterPotabilityService {
 
   // Mock prediction for 9-feature analysis
   Map<String, dynamic> _getMockPrediction9Features(Map<String, double> params) {
-    // Simple logic to mimic the model prediction
+    // Define optimal ranges for each parameter
     bool isGoodPh = params['ph']! >= 6.5 && params['ph']! <= 8.5;
-    bool isGoodTds = params['tds']! < 500;
     bool isGoodHardness = params['hardness']! >= 150 && params['hardness']! <= 300;
-    bool isGoodSolids = params['solids']! < 500;
+    bool isGoodSolids = params['solids']! <= 500; // TDS
     bool isGoodChloramines = params['chloramines']! >= 2 && params['chloramines']! <= 4;
-    bool isGoodSulfate = params['sulfate']! < 250;
-    bool isGoodConductivity = params['conductivity']! < 500;
-    bool isGoodOrganicCarbon = params['organic_carbon']! < 2.5;
-    bool isGoodTrihalomethanes = params['trihalomethanes']! < 80;
+    bool isGoodSulfate = params['sulfate']! <= 250;
+    bool isGoodConductivity = params['conductivity']! <= 500;
+    bool isGoodOrganicCarbon = params['organic_carbon']! <= 2.5;
+    bool isGoodTrihalomethanes = params['trihalomethanes']! <= 80;
+    bool isGoodTurbidity = params['turbidity']! <= 5;
     
     // Count good parameters
     int goodParams = 0;
     if (isGoodPh) goodParams++;
-    if (isGoodTds) goodParams++;
     if (isGoodHardness) goodParams++;
     if (isGoodSolids) goodParams++;
     if (isGoodChloramines) goodParams++;
@@ -107,13 +106,27 @@ class WaterPotabilityService {
     if (isGoodConductivity) goodParams++;
     if (isGoodOrganicCarbon) goodParams++;
     if (isGoodTrihalomethanes) goodParams++;
+    if (isGoodTurbidity) goodParams++;
     
-    // Calculate probability based on number of good parameters
+    // Calculate base probability based on number of good parameters
     double potableProbability = (goodParams / 9) * 100;
     
     // Adjust probability based on critical parameters
-    if (!isGoodPh || !isGoodTds) {
+    if (!isGoodPh || !isGoodSolids) {
       potableProbability *= 0.7; // Reduce probability if critical parameters are not good
+    }
+    
+    // Additional adjustments based on parameter values
+    if (params['ph']! < 6.0 || params['ph']! > 9.0) {
+      potableProbability *= 0.8; // Further reduce if pH is far from optimal
+    }
+    
+    if (params['solids']! > 1000) {
+      potableProbability *= 0.8; // Further reduce if TDS is very high
+    }
+    
+    if (params['turbidity']! > 10) {
+      potableProbability *= 0.9; // Slightly reduce if turbidity is high
     }
     
     // Ensure values stay in range
@@ -123,6 +136,17 @@ class WaterPotabilityService {
       'potable_probability': potableProbability,
       'not_potable_probability': 100 - potableProbability,
       'is_potable': potableProbability > 50,
+      'parameter_status': {
+        'ph': isGoodPh ? 'Good' : 'Poor',
+        'hardness': isGoodHardness ? 'Good' : 'Poor',
+        'solids': isGoodSolids ? 'Good' : 'Poor',
+        'chloramines': isGoodChloramines ? 'Good' : 'Poor',
+        'sulfate': isGoodSulfate ? 'Good' : 'Poor',
+        'conductivity': isGoodConductivity ? 'Good' : 'Poor',
+        'organic_carbon': isGoodOrganicCarbon ? 'Good' : 'Poor',
+        'trihalomethanes': isGoodTrihalomethanes ? 'Good' : 'Poor',
+        'turbidity': isGoodTurbidity ? 'Good' : 'Poor',
+      }
     };
   }
 }
