@@ -24,6 +24,7 @@ class _ReminderPageState extends State<ReminderPage> with WidgetsBindingObserver
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _initializeNotifications();
+    print('ReminderPage initialized');
   }
 
   @override
@@ -42,6 +43,18 @@ class _ReminderPageState extends State<ReminderPage> with WidgetsBindingObserver
       _isLoading = true;
       _errorMessage = null;
     });
+    print('Retrying to load reminders...');
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      print('App resumed, refreshing reminders...');
+      setState(() {
+        _isLoading = true;
+      });
+    }
   }
 
   @override
@@ -121,95 +134,108 @@ class _ReminderPageState extends State<ReminderPage> with WidgetsBindingObserver
                 ),
               ),
               Expanded(
-                child: StreamBuilder<List<Reminder>>(
-                  stream: _reminderRepository.getReminders(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting && _isLoading) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    
-                    if (snapshot.hasError) {
-                      _errorMessage = 'Error loading reminders: ${snapshot.error}';
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.error_outline,
-                              size: 72,
-                              color: Colors.red[400],
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Error loading reminders',
-                              style: TextStyle(
-                                fontSize: 18,
-                                color: Colors.grey[600],
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              _errorMessage ?? 'Please try again later',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[500],
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 16),
-                            ElevatedButton.icon(
-                              onPressed: _retryLoading,
-                              icon: const Icon(Icons.refresh),
-                              label: const Text('Retry'),
-                            ),
-                          ],
-                        ),
-                      );
-                    }
-                    
-                    List<Reminder> reminders = snapshot.data ?? [];
-                    
-                    if (reminders.isEmpty) {
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.notifications_none,
-                              size: 72,
-                              color: Colors.grey[400],
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No reminders yet',
-                              style: TextStyle(
-                                fontSize: 18,
-                                color: Colors.grey[600],
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Tap the + button to add a reminder',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[500],
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }
-                    
-                    return ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: reminders.length,
-                      itemBuilder: (context, index) {
-                        return _buildReminderCard(reminders[index]);
-                      },
-                    );
+                child: RefreshIndicator(
+                  onRefresh: () async {
+                    print('Manual refresh triggered');
+                    setState(() {
+                      _isLoading = true;
+                    });
+                    // Wait a bit to show the refresh indicator
+                    await Future.delayed(const Duration(milliseconds: 500));
+                    setState(() {
+                      _isLoading = false;
+                    });
                   },
+                  child: StreamBuilder<List<Reminder>>(
+                    stream: _reminderRepository.getReminders(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting && _isLoading) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      
+                      if (snapshot.hasError) {
+                        _errorMessage = 'Error loading reminders: ${snapshot.error}';
+                        return Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.error_outline,
+                                size: 72,
+                                color: Colors.red[400],
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Error loading reminders',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  color: Colors.grey[600],
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                _errorMessage ?? 'Please try again later',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[500],
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 16),
+                              ElevatedButton.icon(
+                                onPressed: _retryLoading,
+                                icon: const Icon(Icons.refresh),
+                                label: const Text('Retry'),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                      
+                      List<Reminder> reminders = snapshot.data ?? [];
+                      
+                      if (reminders.isEmpty) {
+                        return Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.notifications_none,
+                                size: 72,
+                                color: Colors.grey[400],
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'No reminders yet',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  color: Colors.grey[600],
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Tap the + button to add a reminder',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[500],
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                      
+                      return ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: reminders.length,
+                        itemBuilder: (context, index) {
+                          return _buildReminderCard(reminders[index]);
+                        },
+                      );
+                    },
+                  ),
                 ),
               ),
             ],

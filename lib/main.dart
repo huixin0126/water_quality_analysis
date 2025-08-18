@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:water_quality_analysis/class/notification.dart';
 
 // Import all screen files
@@ -27,8 +28,16 @@ import 'pages/filter_prediction_history_page.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize Firebase
-  await Firebase.initializeApp();
+  // Initialize Firebase with proper configuration
+  await Firebase.initializeApp(
+    options: const FirebaseOptions(
+      apiKey: "AIzaSyBeMeC8ifzszJ1EoWGYUbS-oGoy7mdD2lM",
+      appId: "1:129872172916:android:8ea63a3205b13920b67e21",
+      messagingSenderId: "129872172916",
+      projectId: "psm-waterqualityanalysis",
+      storageBucket: "psm-waterqualityanalysis.firebasestorage.app",
+    ),
+  );
   
   // Initialize notifications
   await NotificationService.initialize();

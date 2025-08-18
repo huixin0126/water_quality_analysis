@@ -108,7 +108,7 @@ class _FilterSearchPageState extends State<FilterSearchPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Water Filter Search & Recommendation'),
+        title: const Text('Water Filter Products'),
         automaticallyImplyLeading: false,
       ),
       body: _isLoading

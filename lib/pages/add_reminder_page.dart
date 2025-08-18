@@ -82,6 +82,10 @@ class _AddReminderPageState extends State<AddReminderPage> {
 
     try {
       final user = _auth.currentUser;
+      print('Current user: ${user?.uid}');
+      print('User email: ${user?.email}');
+      print('Is user authenticated: ${user != null}');
+      
       if (user == null) throw Exception('User not authenticated');
 
       final DateTime dateTime = DateTime(
@@ -91,6 +95,10 @@ class _AddReminderPageState extends State<AddReminderPage> {
         _selectedTime.hour,
         _selectedTime.minute,
       );
+
+      print('Saving reminder with dateTime: ${dateTime.toString()}');
+      print('Current time: ${DateTime.now().toString()}');
+      print('Is dateTime in future: ${dateTime.isAfter(DateTime.now())}');
 
       final reminder = Reminder(
         id: widget.reminder?.id,
@@ -102,19 +110,35 @@ class _AddReminderPageState extends State<AddReminderPage> {
         userId: user.uid,
       );
 
-      if (widget.reminder == null) {
-        final docRef = await _reminderRepository.addReminder(reminder);
-        final savedReminder = Reminder(
-          id: docRef.id,
-          title: reminder.title,
-          dateTime: reminder.dateTime,
-          repeatDays: reminder.repeatDays,
-          notes: reminder.notes,
-          type: reminder.type,
-          userId: reminder.userId,
-        );
-        await NotificationService.scheduleReminder(savedReminder);
+      print('Created reminder: ${reminder.title} for ${reminder.dateTime}');
+      print('Reminder userId: ${reminder.userId}');
+      print('Widget reminder ID: ${widget.reminder?.id}');
+
+      if (widget.reminder?.id == null) {
+        print('Adding new reminder...');
+        try {
+          final docRef = await _reminderRepository.addReminder(reminder);
+          print('Reminder saved with ID: ${docRef.id}');
+          
+          final savedReminder = Reminder(
+            id: docRef.id,
+            title: reminder.title,
+            dateTime: reminder.dateTime,
+            repeatDays: reminder.repeatDays,
+            notes: reminder.notes,
+            type: reminder.type,
+            userId: reminder.userId,
+          );
+          
+          print('Scheduling notification for reminder: ${savedReminder.title}');
+          await NotificationService.scheduleReminder(savedReminder);
+          print('Notification scheduled successfully');
+        } catch (e) {
+          print('Error in addReminder: $e');
+          throw e;
+        }
       } else {
+        print('Updating existing reminder...');
         await _reminderRepository.updateReminder(reminder);
         await NotificationService.cancelReminder(reminder.id);
         await NotificationService.scheduleReminder(reminder);
@@ -130,9 +154,11 @@ class _AddReminderPageState extends State<AddReminderPage> {
         );
         
         // Navigate back to reminder page
-        Navigator.pushReplacementNamed(context, '/reminder');
+        Navigator.pop(context);
       }
     } catch (e) {
+      print('Error saving reminder: $e');
+      print('Error type: ${e.runtimeType}');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

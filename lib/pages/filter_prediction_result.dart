@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/filter_model.dart';
 import '../main.dart';
+import '../class/reminder.dart';
+import '../pages/add_reminder_page.dart';
 
 class FilterPredictionResultPage extends StatelessWidget {
   final Map<String, dynamic> predictionData;
@@ -258,18 +260,27 @@ class FilterPredictionResultPage extends StatelessWidget {
                         width: double.infinity,
                         child: OutlinedButton(
                           onPressed: () {
+                            // Debug logging
+                            print('Schedule Maintenance button pressed');
+                            print('Replacement date from filter data: ${filterData.replacementDate}');
+                            print('Parsed replacement date: ${replacementDate.toString()}');
+                            print('Current time: ${DateTime.now().toString()}');
+                            print('Is replacement date in future: ${replacementDate.isAfter(DateTime.now())}');
+                            
                             // Navigate to add reminder page with filter replacement details
-                            Navigator.pushNamed(
+                            Navigator.push(
                               context,
-                              '/add_reminder',
-                              arguments: {
-                                'title': 'Filter Replacement',
-                                'type': 'Filter Replacement',
-                                'date': replacementDate,
-                                'time': const TimeOfDay(hour: 10, minute: 0),
-                                'repeat': 'none',
-                                'notes': 'Filter replacement due based on analysis. Estimated replacement date: ${dateFormat.format(replacementDate)}',
-                              },
+                              MaterialPageRoute(
+                                builder: (context) => AddReminderPage(
+                                  reminder: Reminder(
+                                    title: 'Filter Replacement',
+                                    dateTime: replacementDate,
+                                    repeatDays: [],
+                                    notes: 'Filter replacement due based on analysis. Estimated replacement date: ${dateFormat.format(replacementDate)}',
+                                    type: 'Filter Replacement',
+                                  ),
+                                ),
+                              ),
                             );
                           },
                           style: OutlinedButton.styleFrom(

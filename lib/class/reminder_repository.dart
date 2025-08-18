@@ -19,55 +19,77 @@ class ReminderRepository {
   Future<DocumentReference> addReminder(Reminder reminder) async {
     if (_userId == null) throw Exception('User not authenticated');
     
+    print('ReminderRepository.addReminder called');
+    print('User ID: $_userId');
+    print('Reminder title: ${reminder.title}');
+    print('Reminder dateTime: ${reminder.dateTime}');
+    print('Reminder type: ${reminder.type}');
+    
     final now = DateTime.now();
     
-    // If the reminder is repeating, create separate documents for each repeat day
-    if (reminder.isRepeating && reminder.repeatDays.isNotEmpty) {
-      // Calculate the end date (7 days from now)
-      final endDate = now.add(const Duration(days: 7));
-      
-      // Create a base reminder data
-      final baseReminderData = reminder.toMap();
-      baseReminderData['userId'] = _userId;
-      baseReminderData['isBaseReminder'] = true; // Mark as base reminder
-      
-      // Save the base reminder
-      final baseDocRef = await remindersCollection.add(baseReminderData);
-      
-      // For each repeat day, create a separate reminder
-      for (int day in reminder.repeatDays) {
-        if (day > 0) { // Skip if day is 0 (no repeat)
-          // Calculate the next occurrence for this day
-          DateTime nextOccurrence = _getNextOccurrence(reminder.dateTime, day);
-          
-          // Only save if the next occurrence is within the next 7 days
-          if (nextOccurrence.isBefore(endDate)) {
-            // Create reminder data for this specific day
-            final dayReminderData = {
-              'title': reminder.title,
-              'dateTime': Timestamp.fromDate(nextOccurrence),
-              'repeatDays': [day], // Only include this specific day
-              'notes': reminder.notes,
-              'type': reminder.type,
-              'userId': _userId,
-              'isBaseReminder': false,
-              'baseReminderId': baseDocRef.id, // Reference to the base reminder
-              'createdAt': Timestamp.fromDate(now),
-            };
+    try {
+      // If the reminder is repeating, create separate documents for each repeat day
+      if (reminder.isRepeating && reminder.repeatDays.isNotEmpty) {
+        print('Adding repeating reminder...');
+        // Calculate the end date (7 days from now)
+        final endDate = now.add(const Duration(days: 7));
+        
+        // Create a base reminder data
+        final baseReminderData = reminder.toMap();
+        baseReminderData['userId'] = _userId;
+        baseReminderData['isBaseReminder'] = true; // Mark as base reminder
+        
+        print('Saving base reminder to Firestore...');
+        // Save the base reminder
+        final baseDocRef = await remindersCollection.add(baseReminderData);
+        print('Base reminder saved with ID: ${baseDocRef.id}');
+        
+        // For each repeat day, create a separate reminder
+        for (int day in reminder.repeatDays) {
+          if (day > 0) { // Skip if day is 0 (no repeat)
+            // Calculate the next occurrence for this day
+            DateTime nextOccurrence = _getNextOccurrence(reminder.dateTime, day);
             
-            // Save the day-specific reminder
-            await remindersCollection.add(dayReminderData);
+            // Only save if the next occurrence is within the next 7 days
+            if (nextOccurrence.isBefore(endDate)) {
+              // Create reminder data for this specific day
+              final dayReminderData = {
+                'title': reminder.title,
+                'dateTime': Timestamp.fromDate(nextOccurrence),
+                'repeatDays': [day], // Only include this specific day
+                'notes': reminder.notes,
+                'type': reminder.type,
+                'userId': _userId,
+                'isBaseReminder': false,
+                'baseReminderId': baseDocRef.id, // Reference to the base reminder
+                'createdAt': Timestamp.fromDate(now),
+              };
+              
+              print('Saving day-specific reminder for day $day...');
+              // Save the day-specific reminder
+              await remindersCollection.add(dayReminderData);
+              print('Day-specific reminder saved successfully');
+            }
           }
         }
+        
+        return baseDocRef;
+      } else {
+        print('Adding non-repeating reminder...');
+        // For non-repeating reminders, save as normal
+        final reminderData = reminder.toMap();
+        reminderData['userId'] = _userId;
+        reminderData['isBaseReminder'] = true;
+        
+        print('Saving reminder data to Firestore: $reminderData');
+        final docRef = await remindersCollection.add(reminderData);
+        print('Reminder saved successfully with ID: ${docRef.id}');
+        return docRef;
       }
-      
-      return baseDocRef;
-    } else {
-      // For non-repeating reminders, save as normal
-      final reminderData = reminder.toMap();
-      reminderData['userId'] = _userId;
-      reminderData['isBaseReminder'] = true;
-      return await remindersCollection.add(reminderData);
+    } catch (e) {
+      print('Error saving reminder to Firestore: $e');
+      print('Error type: ${e.runtimeType}');
+      rethrow;
     }
   }
 
@@ -87,18 +109,31 @@ class ReminderRepository {
           try {
             List<Reminder> reminders = [];
             final now = DateTime.now();
+            final oneHourAgo = now.subtract(const Duration(hours: 1));
+            
+            print('Fetching reminders at: ${now.toString()}');
+            print('Total documents in snapshot: ${snapshot.docs.length}');
             
             for (var doc in snapshot.docs) {
               Reminder reminder = Reminder.fromFirestore(doc);
               
-              // Only add if the reminder is in the future
-              if (reminder.dateTime.isAfter(now)) {
+              print('Processing reminder: ${reminder.title} at ${reminder.dateTime.toString()}');
+              print('Reminder is in future: ${reminder.dateTime.isAfter(now)}');
+              print('Reminder is within last hour: ${reminder.dateTime.isAfter(oneHourAgo)}');
+              
+              // Allow reminders that are in the future or within the last hour
+              // This prevents reminders from disappearing immediately if there are timezone issues
+              if (reminder.dateTime.isAfter(oneHourAgo)) {
                 reminders.add(reminder);
+                print('Added reminder: ${reminder.title}');
+              } else {
+                print('Filtered out reminder: ${reminder.title} (too old)');
               }
             }
             
             // Sort reminders by date
             reminders.sort((a, b) => a.dateTime.compareTo(b.dateTime));
+            print('Final reminders count: ${reminders.length}');
             return reminders;
           } catch (e) {
             print('Error parsing reminders: $e');

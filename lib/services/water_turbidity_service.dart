@@ -27,6 +27,52 @@ class WaterTurbidityService {
       }
 
       final results = await model.analyzeImage(imageFile);
+      
+      // Debug: Print raw outputs to see all class confidences
+      if (results.containsKey('raw_outputs')) {
+        final rawOutputs = results['raw_outputs'] as List<double>;
+        print('=== RAW MODEL OUTPUTS ===');
+        print('Class 0 (Around 150 NTU): ${(rawOutputs[0] * 100).toStringAsFixed(2)}%');
+        print('Class 1 (Around 30 NTU): ${(rawOutputs[1] * 100).toStringAsFixed(2)}%');
+        print('Class 2 (Around 90 NTU): ${(rawOutputs[2] * 100).toStringAsFixed(2)}%');
+        print('Class 3 (Below 1 NTU): ${(rawOutputs[3] * 100).toStringAsFixed(2)}%');
+        print('Class 4 (WaterCup): ${(rawOutputs[4] * 100).toStringAsFixed(2)}%');
+        print('=== END RAW OUTPUTS ===');
+      }
+      
+      // Check for WaterCup in detected_classes first, even if input is invalid
+      final List<dynamic> initialDetectedClasses = results['detected_classes'] as List<dynamic>;
+      if (initialDetectedClasses.isNotEmpty) {
+        for (var classInfo in initialDetectedClasses) {
+          final String className = classInfo['class_name'] as String;
+          final double confidence = (classInfo['confidence'] as double) * 100;
+          
+          print('Class: $className, Confidence: $confidence');
+          
+          // Check if this is WaterCup
+          if (className == 'WaterCup') {
+            print('WaterCup detected with confidence: $confidence%');
+          }
+        }
+      }
+      
+      // Check if this is an invalid input
+      if (WaterQualityModel.isInvalidInput(results)) {
+        // For invalid inputs, set all confidence percentages to 0
+        Map<String, double> confidencePercentages = {
+          'NTU_below_1': 0.0,
+          'Around_30_NTU': 0.0,
+          'Around_90_NTU': 0.0,
+          'Around_150_NTU': 0.0,
+        };
+        
+        results['confidence_percentages'] = confidencePercentages;
+        results['highest_confidence_range'] = 'Invalid_Input';
+        results['confidence_display'] = 'Invalid Input';
+        
+        return results;
+      }
+      
       final List<dynamic> detectedClasses = results['detected_classes'] as List<dynamic>;
 
       // Match the new class names
@@ -42,6 +88,19 @@ class WaterTurbidityService {
         final double confidence = (classInfo['confidence'] as double) * 100;
         
         print('Class: $className, Confidence: $confidence');
+        print('Class name contains "WaterCup": ${className.contains('WaterCup')}');
+        print('Class name contains "Not a turbidity class": ${className.contains('Not a turbidity class')}');
+        print('Class name contains "cup": ${className.toLowerCase().contains('cup')}');
+        print('Class name contains "not": ${className.toLowerCase().contains('not')}');
+
+        // Skip WaterCup class as it's not a valid turbidity class
+        if (className.contains('WaterCup') || 
+            className.contains('Not a turbidity class') ||
+            className.toLowerCase().contains('cup') ||
+            className.toLowerCase().contains('not a turbidity')) {
+          print('WaterCup detected with confidence: $confidence%');
+          continue;
+        }
 
         if (className.contains('1')) {
           confidencePercentages['NTU_below_1'] = 
@@ -108,6 +167,11 @@ class WaterTurbidityService {
     try {
       if (_userId == null) {
         throw Exception('User not authenticated');
+      }
+      
+      // Check if this is an invalid input
+      if (WaterQualityModel.isInvalidInput(results)) {
+        throw Exception('Cannot save invalid analysis results');
       }
       
       // Create a new document reference with an auto-generated ID
@@ -254,6 +318,8 @@ class WaterTurbidityService {
         return Colors.orange;
       case 'Around_150_NTU':
         return Colors.brown;
+      case 'Invalid_Input':
+        return Colors.grey;
       default:
         return Colors.grey;
     }

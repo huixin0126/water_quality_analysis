@@ -114,14 +114,19 @@ class _SignInPageState extends State<SignInPage> {
     });
 
     try {
+      print("Starting Google Sign-In process...");
+      
       // First sign out of any previous Google sign-in to avoid caching issues
       await _googleSignIn.signOut();
+      print("Signed out of previous Google session");
       
       // Trigger the Google Sign-In flow
+      print("Triggering Google Sign-In...");
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       
       // If the user canceled the sign-in flow, return
       if (googleUser == null) {
+        print("Google Sign-In was canceled by user");
         setState(() {
           _isLoading = false;
         });
@@ -129,20 +134,27 @@ class _SignInPageState extends State<SignInPage> {
       }
 
       print("Google Sign In successful: ${googleUser.email}");
+      print("Google user ID: ${googleUser.id}");
 
       // Obtain the auth details from the Google Sign In request
+      print("Getting Google authentication tokens...");
       final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
 
       // Check if we got the tokens
       if (googleAuth.accessToken == null || googleAuth.idToken == null) {
+        print("Google authentication failed: accessToken=${googleAuth.accessToken != null}, idToken=${googleAuth.idToken != null}");
         throw Exception("Google authentication failed: Missing tokens");
       }
+
+      print("Google tokens obtained successfully");
 
       // Create a new credential
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
+
+      print("Created Firebase credential, signing in to Firebase...");
 
       // Sign in to Firebase with the Google credential
       UserCredential userCredential = await _auth.signInWithCredential(credential);
@@ -155,12 +167,15 @@ class _SignInPageState extends State<SignInPage> {
       
       if (user != null) {
         print("Firebase auth successful: ${user.uid}");
+        print("User email: ${user.email}");
+        print("Is new user: $isNewUser");
         
         // Reference to the user document
         DocumentReference userRef = _firestore.collection('users').doc(user.uid);
         
         if (isNewUser) {
           // Create a new user document if this is the first sign-in
+          print("Creating new user document in Firestore...");
           await userRef.set({
             'email': user.email,
             'displayName': user.displayName ?? '',
@@ -172,6 +187,7 @@ class _SignInPageState extends State<SignInPage> {
           print("New user document created in Firestore");
         } else {
           // Update existing user information
+          print("Updating existing user document in Firestore...");
           await userRef.update({
             'lastLogin': FieldValue.serverTimestamp(),
           }).catchError((error) {
@@ -191,11 +207,19 @@ class _SignInPageState extends State<SignInPage> {
         
         // Navigate to home page
         if (mounted) {
+          print("Navigating to home page...");
           Navigator.pushReplacementNamed(context, '/home');
         }
+      } else {
+        throw Exception("Firebase user is null after successful authentication");
       }
     } catch (e) {
       print("Google sign in error: $e");
+      print("Error type: ${e.runtimeType}");
+      if (e is FirebaseAuthException) {
+        print("Firebase Auth Error Code: ${e.code}");
+        print("Firebase Auth Error Message: ${e.message}");
+      }
       setState(() {
         _errorMessage = 'Failed to sign in with Google: $e';
       });
@@ -207,27 +231,160 @@ class _SignInPageState extends State<SignInPage> {
   }
 
   // Handle forgot password
-  Future<void> _resetPassword() async {
-    if (_emailController.text.isEmpty) {
-      setState(() {
-        _errorMessage = 'Please enter your email to reset password';
-      });
-      return;
-    }
+  void _showForgotPasswordDialog() {
+    final TextEditingController resetEmailController = TextEditingController();
+    bool isLoading = false;
+    String errorMessage = '';
 
-    try {
-      await _auth.sendPasswordResetEmail(email: _emailController.text.trim());
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Password reset email sent! Check your inbox.'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } on FirebaseAuthException catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to send reset email: ${e.message}';
-      });
-    }
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Reset Password'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Enter your email address to receive a password reset link.',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: resetEmailController,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: const InputDecoration(
+                      labelText: 'Email',
+                      prefixIcon: Icon(Icons.email_outlined),
+                      hintText: 'Enter your email',
+                    ),
+                  ),
+                  if (errorMessage.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      errorMessage,
+                      style: TextStyle(
+                        color: Colors.red.shade700,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: isLoading
+                          ? null
+                          : () async {
+                              final email = resetEmailController.text.trim();
+                              
+                              // Validate email
+                              if (email.isEmpty) {
+                                setState(() {
+                                  errorMessage = 'Please enter your email';
+                                });
+                                return;
+                              }
+
+                              // Basic email format validation
+                              final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                              if (!emailRegex.hasMatch(email)) {
+                                setState(() {
+                                  errorMessage = 'Please enter a valid email address';
+                                });
+                                return;
+                              }
+
+                              setState(() {
+                                isLoading = true;
+                                errorMessage = '';
+                              });
+
+                              try {
+                                await _auth.sendPasswordResetEmail(email: email);
+                                
+                                if (context.mounted) {
+                                  Navigator.of(context).pop(); // Close the dialog
+                                  // Show success dialog
+                                  showDialog(
+                                    context: context,
+                                    builder: (BuildContext context) {
+                                      return AlertDialog(
+                                        title: const Text('Password Reset Email Sent'),
+                                        content: const Text(
+                                          'We have sent a password reset link to your email address. '
+                                          'Please check your inbox and follow the instructions to reset your password.',
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () {
+                                              Navigator.of(context).pop();
+                                            },
+                                            child: const Text('OK'),
+                                          ),
+                                        ],
+                                      );
+                                    },
+                                  );
+                                }
+                              } on FirebaseAuthException catch (e) {
+                                String message;
+                                switch (e.code) {
+                                  case 'user-not-found':
+                                    message = 'No account found with this email address.';
+                                    break;
+                                  case 'invalid-email':
+                                    message = 'The email address is not valid.';
+                                    break;
+                                  case 'too-many-requests':
+                                    message = 'Too many attempts. Please try again later.';
+                                    break;
+                                  default:
+                                    message = 'Failed to send reset email: ${e.message}';
+                                }
+                                setState(() {
+                                  errorMessage = message;
+                                });
+                              } catch (e) {
+                                setState(() {
+                                  errorMessage = 'An unexpected error occurred. Please try again.';
+                                });
+                              } finally {
+                                if (context.mounted) {
+                                  setState(() {
+                                    isLoading = false;
+                                  });
+                                }
+                              }
+                            },
+                      child: isLoading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text('Reset Password'),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('Cancel'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -316,7 +473,7 @@ class _SignInPageState extends State<SignInPage> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
-                    onPressed: _resetPassword,
+                    onPressed: _showForgotPasswordDialog,
                     child: const Text(
                       'Forgot password?',
                       style: TextStyle(

@@ -37,6 +37,40 @@ class _WaterTurbidityResultPageState extends State<WaterTurbidityResultPage> {
     try {
       final results = await _turbidityService.analyzeTurbidityWithConfidence(widget.imageFile);
       
+      // Check for WaterCup confidence first
+      final detectedClasses = results['detected_classes'] as List<dynamic>?;
+      if (detectedClasses != null && detectedClasses.isNotEmpty) {
+        // Find the class with the highest confidence
+        final maxClass = (detectedClasses as List<Map<String, dynamic>>).reduce((a, b) => (a['confidence'] as double) > (b['confidence'] as double) ? a : b);
+        final className = maxClass['class_name'] as String;
+        final confidence = (maxClass['confidence'] as double) * 100;
+        
+        // If WaterCup confidence is low (<30%), mark as invalid
+        if ((className.contains('WaterCup') || className.contains('Not a turbidity class')) && confidence < 45.0) {
+          // Show alert and return to image upload page
+          await showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Invalid Image'),
+              content: const Text('The image does not appear to contain a valid water sample. Please try again with a clearer image.'),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+          // Return to image upload page
+          if (mounted) {
+            Navigator.of(context).pop();
+          }
+          return;
+        }
+      }
+      
       setState(() {
         _analysisResults = results;
         _isAnalyzing = false;
@@ -52,6 +86,17 @@ class _WaterTurbidityResultPageState extends State<WaterTurbidityResultPage> {
 
   Future<void> _saveResults() async {
     if (_analysisResults == null) return;
+    
+    // Check if this is an invalid input
+    if (WaterQualityModel.isInvalidInput(_analysisResults!)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cannot save invalid analysis results. Please try again with a valid water sample.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
     
     setState(() {
       _isSaving = true;
@@ -102,7 +147,40 @@ class _WaterTurbidityResultPageState extends State<WaterTurbidityResultPage> {
   }
 
   Widget _buildTurbidityDonut(List<dynamic> detectedClasses) {
-    if (detectedClasses.isEmpty) return const SizedBox.shrink();
+    if (detectedClasses.isEmpty) {
+      return const Card(
+        child: Padding(
+          padding: EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              Icon(
+                Icons.help_outline,
+                size: 48,
+                color: Colors.grey,
+              ),
+              SizedBox(height: 8),
+              Text(
+                'No turbidity classes detected',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
+              SizedBox(height: 4),
+              Text(
+                'The image may not contain a valid water sample',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     // Get class with highest confidence
     final maxClass = (detectedClasses as List<Map<String, dynamic>>).reduce(
@@ -165,12 +243,37 @@ class _WaterTurbidityResultPageState extends State<WaterTurbidityResultPage> {
     final detectedClasses = _analysisResults!['detected_classes'] as List<dynamic>;
     
     if (detectedClasses.isEmpty) {
-      return const Card(
+      return Card(
+        color: Colors.orange.shade50,
         child: Padding(
-          padding: EdgeInsets.all(16.0),
-          child: Text(
-            'No specific turbidity classes detected with high confidence.',
-            style: TextStyle(fontStyle: FontStyle.italic),
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              Icon(
+                Icons.warning_amber,
+                size: 32,
+                color: Colors.orange.shade700,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'No specific turbidity classes detected',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.orange.shade700,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'This may indicate an invalid or unclear water sample. Please ensure the image contains a clear water sample with proper lighting.',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.orange.shade600,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
           ),
         ),
       );
@@ -298,148 +401,267 @@ class _WaterTurbidityResultPageState extends State<WaterTurbidityResultPage> {
                     style: const TextStyle(color: Colors.red),
                   ),
                 )
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // Image preview
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Image.file(
-                          widget.imageFile,
-                          height: 200,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      
-                      // Primary result
-                      Card(
-                        elevation: 3,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            children: [
-                              const Text(
-                                'Water Quality Status',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              Text(
-                                _analysisResults!['water_quality_status'] as String,
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: _getColorForTurbidity(_analysisResults!['estimated_ntu'] as double),
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      
-                      // Turbidity donut
-                      _buildTurbidityDonut(_analysisResults!['detected_classes'] as List<dynamic>),
-                      const SizedBox(height: 24),
-                      
-                      // Detailed class results
-                      _buildClassDetails(),
-                      
-                      const SizedBox(height: 24),
-                      
-                      // Notes field
-                      _buildNotesField(),
-                      
-                      const SizedBox(height: 24),
-                      
-                      // Water quality recommendations
-                      Card(
-                        color: Colors.blue.shade50,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Recommendations',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              Text(
-                                _getRecommendationFromClass(
-                                  (_analysisResults!['detected_classes'] as List<dynamic>)
-                                      .cast<Map<String, dynamic>>()
-                                      .reduce((a, b) => (a['confidence'] as double) > (b['confidence'] as double) ? a : b)['class_name'] as String,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      
-                      const SizedBox(height: 30),
-                      
-                      // Action buttons
-                      Row(
+              : _analysisResults != null && WaterQualityModel.isInvalidInput(_analysisResults!)
+                  ? _buildInvalidInputUI()
+                  : SingleChildScrollView(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () {
-                                // Go back to capture another image
-                                Navigator.pop(context);
-                              },
-                              icon: const Icon(Icons.camera_alt),
-                              label: const Text('New Analysis'),
-                              style: ElevatedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 16),
+                          // Image preview
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Image.file(
+                              widget.imageFile,
+                              height: 200,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          
+                          // Primary result
+                          Card(
+                            elevation: 3,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Column(
+                                children: [
+                                  const Text(
+                                    'Water Quality Status',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Text(
+                                    _analysisResults!['water_quality_status'] as String,
+                                    style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: _getColorForTurbidity(_analysisResults!['estimated_ntu'] as double),
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
                               ),
                             ),
                           ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: _isSaving ? null : _saveResults,
-                              icon: _isSaving 
-                                  ? const SizedBox(
-                                      width: 20, 
-                                      height: 20, 
-                                      child: CircularProgressIndicator(strokeWidth: 2)
-                                    )
-                                  : const Icon(Icons.save),
-                              label: Text(_isSaving ? 'Saving...' : 'Save Results'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
+                          const SizedBox(height: 24),
+                          
+                          // Turbidity donut
+                          _buildTurbidityDonut(_analysisResults!['detected_classes'] as List<dynamic>),
+                          const SizedBox(height: 24),
+                          
+                          // Detailed class results
+                          _buildClassDetails(),
+                          
+                          const SizedBox(height: 24),
+                          
+                          // Notes field
+                          _buildNotesField(),
+                          
+                          const SizedBox(height: 24),
+                          
+                          // Water quality recommendations
+                          Card(
+                            color: Colors.blue.shade50,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Recommendations',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Text(
+                                    _getRecommendationFromClass(
+                                      (_analysisResults!['detected_classes'] as List<dynamic>)
+                                          .cast<Map<String, dynamic>>()
+                                          .reduce((a, b) => (a['confidence'] as double) > (b['confidence'] as double) ? a : b)['class_name'] as String,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
+                          ),
+                          
+                          const SizedBox(height: 30),
+                          
+                          // Action buttons
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: () {
+                                    // Go back to capture another image
+                                    Navigator.pop(context);
+                                  },
+                                  icon: const Icon(Icons.camera_alt),
+                                  label: const Text('New Analysis'),
+                                  style: ElevatedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: _isSaving ? null : _saveResults,
+                                  icon: _isSaving 
+                                      ? const SizedBox(
+                                          width: 20, 
+                                          height: 20, 
+                                          child: CircularProgressIndicator(strokeWidth: 2)
+                                        )
+                                      : const Icon(Icons.save),
+                                  label: Text(_isSaving ? 'Saving...' : 'Save Results'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.green,
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                ),
+                    ),
       bottomNavigationBar: const BottomNavBar(currentIndex: 1),
     );
   }
   
+  Widget _buildInvalidInputUI() {
+    final errorMessage = _analysisResults!['error_message'] as String? ?? 'Invalid input detected';
+    final waterQualityStatus = _analysisResults!['water_quality_status'] as String? ?? 'Invalid Input';
+    
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Image preview
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.file(
+              widget.imageFile,
+              height: 200,
+              width: double.infinity,
+              fit: BoxFit.cover,
+            ),
+          ),
+          const SizedBox(height: 24),
+          
+          // Error card
+          Card(
+            elevation: 3,
+            color: Colors.red.shade50,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: Colors.red.shade200),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: 48,
+                    color: Colors.red.shade600,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    waterQualityStatus,
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.red.shade700,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    errorMessage,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.red.shade600,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          
+          // Tips card
+          Card(
+            color: Colors.blue.shade50,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Tips for Better Analysis',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    '• Ensure the image contains a clear water sample\n'
+                    '• Use good lighting conditions\n'
+                    '• Avoid shadows or reflections\n'
+                    '• Make sure the water is visible and not obscured\n'
+                    '• Use a clean, transparent container',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 30),
+          
+          // Action button
+          ElevatedButton.icon(
+            onPressed: () {
+              // Go back to capture another image
+              Navigator.pop(context);
+            },
+            icon: const Icon(Icons.camera_alt),
+            label: const Text('Try Again'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
   String _getRecommendationFromClass(String className) {
-    if (className.contains('1')) {
+    if (className.contains('WaterCup') || className.contains('Not a turbidity class')) {
+      return 'This image does not appear to contain a valid water sample. Please capture an image of water for turbidity analysis.';
+    } else if (className.contains('1')) {
       return 'Water is clear and can be safe for drinking after standard disinfection. Suitable for most uses.';
     } else if (className.contains('30')) {
       return 'Water has low turbidity. Basic filtration recommended before drinking. Suitable for most uses after treatment.';

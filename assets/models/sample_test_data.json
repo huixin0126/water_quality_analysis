@@ -1,13 +1,13 @@
 {
-  "model_version": "1.0.0",
-  "description": "Water filter prediction models metadata",
-  "feature_names": ["tds", "turbidity", "ph", "depth", "flow_rate"],
-  "feature_defaults": [250.0, 5.0, 7.0, 2.75, 50.0],
-  "feature_ranges": {
-    "tds": [0.01, 500.0],
-    "turbidity": [0.1, 20.0],
-    "ph": [6.0, 8.5],
-    "depth": [1.0, 5.0],
-    "flow_rate": [20.0, 100.0]
-  }
+  "sample_input": [
+    [
+      249.62173461914062,
+      4.99600076675415,
+      7.250061988830566,
+      2.7536144256591797,
+      50.30021667480469
+    ]
+  ],
+  "sample_life_output": 573.8922729492188,
+  "sample_efficiency_output": 0.8049824237823486
 }

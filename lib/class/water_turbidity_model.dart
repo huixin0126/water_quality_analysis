@@ -109,19 +109,74 @@ class WaterQualityModel {
   }
 
   Map<String, dynamic> _processResults(List<double> outputs) {
-    // Apply threshold to get class predictions, excluding WaterCup (index 4)
+    final waterCupConfidence = outputs[4];
+    final maxNtuConfidence = outputs.take(4).reduce((a, b) => a > b ? a : b);
+    final ntuAboveThreshold = outputs.take(4).any((c) => c > threshold);
+    final allLow = outputs.every((c) => c < 0.2);
+    
+    // First check WaterCup confidence
+    if (waterCupConfidence < 0.45) {
+      // WaterCup confidence is low (<45%), this is NOT a WaterCup - not a valid water sample
+      return {
+        'raw_outputs': outputs,
+        'detected_classes': [{
+          'class_id': 4,
+          'class_name': classInfo[4]?['name'] ?? 'WaterCup',
+          'ntu_value': classInfo[4]?['ntu_value'] ?? 0.0,
+          'description': classInfo[4]?['description'] ?? 'Not a turbidity class',
+          'confidence': waterCupConfidence,
+        }],
+        'estimated_ntu': 0.0,
+        'water_quality_status': 'Invalid Input - Not a water sample',
+        'is_valid_input': false,
+        'error_message': 'The image does not contain a water sample. Please capture an image of water for turbidity analysis.',
+        'max_ntu_confidence': maxNtuConfidence,
+        'water_cup_confidence': waterCupConfidence
+      };
+    }
+    
+    // WaterCup confidence is high (≥45%), this IS a WaterCup - continue with NTU detection (valid water sample)
+    // More strict validation: require higher confidence for NTU classes
+    final ntuAboveStrictThreshold = outputs.take(4).any((c) => c > 0.5); // Higher threshold for NTU
+
+    // If all classes are low, mark as invalid
+    if (allLow) {
+      return {
+        'raw_outputs': outputs,
+        'detected_classes': [],
+        'estimated_ntu': 0.0,
+        'water_quality_status': 'Invalid Input - Unable to analyze',
+        'is_valid_input': false,
+        'error_message': 'Unable to detect any water turbidity characteristics. Please ensure the image contains a clear water sample with proper lighting.',
+        'max_ntu_confidence': maxNtuConfidence,
+        'water_cup_confidence': waterCupConfidence
+      };
+    }
+
+    // Only treat as valid if NTU classes have high confidence
+    if (!ntuAboveStrictThreshold) {
+      return {
+        'raw_outputs': outputs,
+        'detected_classes': [],
+        'estimated_ntu': 0.0,
+        'water_quality_status': 'Invalid Input - Not a water sample',
+        'is_valid_input': false,
+        'error_message': 'The image does not appear to contain a water sample. Please capture an image of water for turbidity analysis.',
+        'max_ntu_confidence': maxNtuConfidence,
+        'water_cup_confidence': waterCupConfidence
+      };
+    }
+
+    // Otherwise, treat as valid
     final predictions = List<bool>.generate(
       numClasses,
       (i) => outputs[i] > threshold,
     );
-    
-    // Create results map
     final results = <String, dynamic>{
       'raw_outputs': outputs,
       'detected_classes': <Map<String, dynamic>>[],
+      'is_valid_input': true,
     };
-    
-    // Add detailed results for each NTU class only (exclude WaterCup)
     for (int i = 0; i < numClasses - 1; i++) {
       if (predictions[i]) {
         results['detected_classes'].add({
@@ -133,14 +188,27 @@ class WaterQualityModel {
         });
       }
     }
-    
-    // Calculate estimated NTU value using weighted average
+    // If no classes detected above threshold, but we have some confidence, add the highest confidence class
+    if (results['detected_classes'].isEmpty && maxNtuConfidence > 0.1) {
+      int highestConfIdx = 0;
+      double highestConf = 0.0;
+      for (int i = 0; i < numClasses - 1; i++) {
+        if (outputs[i] > highestConf) {
+          highestConf = outputs[i];
+          highestConfIdx = i;
+        }
+      }
+      results['detected_classes'].add({
+        'class_id': highestConfIdx,
+        'class_name': classInfo[highestConfIdx]?['name'] ?? 'Unknown',
+        'ntu_value': classInfo[highestConfIdx]?['ntu_value'] ?? 0.0,
+        'description': classInfo[highestConfIdx]?['description'] ?? '',
+        'confidence': highestConf,
+      });
+    }
     final estimatedNtu = _calculateEstimatedNTU(outputs);
     results['estimated_ntu'] = estimatedNtu;
-    
-    // Determine water quality status based on NTU
     results['water_quality_status'] = _getWaterQualityStatus(estimatedNtu);
-    
     return results;
   }
   
@@ -159,8 +227,21 @@ class WaterQualityModel {
       }
     }
     
-    // If no class is detected with confidence > threshold, use the highest confidence class
+    // If no class is detected with confidence > threshold, check if it's an invalid input
     if (totalWeight <= 0.0) {
+      final waterCupConfidence = outputs[4];
+      final maxNtuConfidence = outputs.take(4).reduce((a, b) => a > b ? a : b);
+      final allLow = outputs.every((c) => c < 0.2);
+      final waterCupDominant = waterCupConfidence > maxNtuConfidence + 0.1;
+      final suspiciousPattern = maxNtuConfidence < 0.4 && waterCupConfidence > 0.3;
+      final ntuAboveStrictThreshold = outputs.take(4).any((c) => c > 0.5);
+      
+      // Check if this is an invalid input using the same logic as _processResults
+      if (allLow || waterCupDominant || suspiciousPattern || !ntuAboveStrictThreshold) {
+        return 0.0; // Invalid input
+      }
+      
+      // If we have some confidence but below threshold, use the highest confidence class
       int highestConfIdx = 0;
       double highestConf = 0.0;
       
@@ -194,7 +275,9 @@ class WaterQualityModel {
   
   // Get a color representing the turbidity level
   static Color getTurbidityColor(double ntu) {
-    if (ntu < 1.0) {
+    if (ntu == 0.0) {
+      return Colors.grey; // Invalid input or non-water image
+    } else if (ntu < 1.0) {
       return Colors.lightBlue; // Clear blue
     } else if (ntu <= 5.0) {
       return Colors.blue.shade300;
@@ -205,6 +288,12 @@ class WaterQualityModel {
     } else {
       return Colors.brown;
     }
+  }
+  
+  // Check if the analysis result indicates an invalid input
+  static bool isInvalidInput(Map<String, dynamic> results) {
+    return results['is_valid_input'] == false || 
+           results.containsKey('error_message');
   }
   
   void dispose() {
